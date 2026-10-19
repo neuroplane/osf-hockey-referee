@@ -1,0 +1,213 @@
+:root {
+  --sidebar-w: 320px;
+  --accent: #6ea8fe;
+  --bg: #16181d;
+  --bg-2: #1d2026;
+  --bg-3: #23262d;
+  --fg: #e4e6eb;
+  --fg-dim: #9aa0aa;
+  --border: #33373f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg);
+  background: var(--bg);
+  margin: 0;
+  display: flex;
+}
+
+a { color: var(--accent); }
+
+/* ---------- search bar ---------- */
+#search-bar {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-w);
+  right: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+#search-bar input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  font-size: 16px; /* без зума на iOS */
+  color: var(--fg);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+#search-bar input:focus { outline: 2px solid var(--accent); }
+#search-count { font-size: 13px; color: var(--fg-dim); min-width: 52px; white-space: nowrap; text-align: center; }
+#search-bar button {
+  padding: 8px 11px;
+  font-size: 15px;
+  color: var(--fg);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+#search-bar button:hover { background: #2c313a; }
+
+#menu-toggle { display: none; font-size: 19px; line-height: 1; }
+
+/* ---------- sidebar TOC ---------- */
+#TOC {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  height: 100vh;
+  overflow-y: auto;
+  position: sticky;
+  top: 0;
+  border-right: 1px solid var(--border);
+  padding: 12px 14px 60px;
+  font-size: 14px;
+  background: var(--bg-2);
+}
+#TOC::before {
+  content: "Содержание";
+  display: block;
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 8px;
+  position: sticky;
+  top: -12px;
+  background: var(--bg-2);
+  padding: 10px 0 6px;
+}
+#TOC ul { list-style: none; padding-left: 12px; margin: 0; }
+#TOC > ul { padding-left: 0; }
+#TOC li { margin: 3px 0; }
+#TOC a { color: var(--fg); text-decoration: none; display: block; padding: 3px 6px; border-radius: 6px; }
+#TOC a:hover { background: var(--bg-3); }
+#TOC a.active { background: var(--accent); color: #10131a; }
+
+#TOC .toc-section {
+  display: block;
+  padding: 10px 6px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--fg-dim);
+  border-bottom: 1px solid var(--border);
+  margin-top: 6px;
+  cursor: default;
+}
+#TOC li:first-child .toc-section { margin-top: 0; }
+
+#toc-backdrop { display: none; }
+
+/* ---------- content ---------- */
+main {
+  flex: 1;
+  min-width: 0;
+  max-width: 980px;
+  padding: 16px 36px 140px;
+  margin-top: 54px;
+}
+#title-block-header { display: none; }
+
+h1 { font-size: 23px; margin-top: 1.6em; border-bottom: 2px solid var(--accent); padding-bottom: 6px; scroll-margin-top: 80px; color: #fff; }
+h1:first-of-type { margin-top: 0; }
+h2 { font-size: 19px; margin-top: 1.6em; scroll-margin-top: 80px; color: #f0f2f5; }
+h3, h4 { scroll-margin-top: 80px; color: #e8eaee; }
+h4 { font-size: 15px; }
+
+.table-scroll { overflow-x: auto; margin: 12px 0; }
+table { border-collapse: collapse; width: 100%; margin: 0; font-size: 13.5px; }
+th, td { border: 1px solid var(--border); padding: 5px 9px; vertical-align: top; text-align: left; }
+th { background: var(--bg-3); color: #fff; }
+td { background: var(--bg-2); }
+tr:nth-child(even) td { background: #21242b; }
+
+img { max-width: 100%; height: auto; display: block; margin: 10px auto; background: #fff; border-radius: 4px; padding: 4px; }
+blockquote { margin: 6px 0; padding: 1px 12px; border-left: 3px solid var(--accent); background: var(--bg-3); color: var(--fg-dim); font-style: italic; }
+blockquote p { margin: 4px 0; }
+code { background: var(--bg-3); padding: 1px 4px; border-radius: 3px; }
+hr { border: none; border-top: 1px solid var(--border); }
+
+mark.hit { background: #7a5c00; color: #fff; padding: 0 1px; }
+mark.hit.current { background: #e07b00; outline: 1px solid #ffb84d; }
+
+/* ---------- «к содержанию» ---------- */
+.to-top-wrap { text-align: right; margin: 14px 0 -6px; }
+.to-top {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-dim);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  background: var(--bg-3);
+}
+.to-top:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- мобильный режим ---------- */
+@media (max-width: 900px) {
+  body { display: block; }
+
+  #search-bar { left: 0; padding: 8px 10px; }
+  #menu-toggle { display: inline-block; }
+
+  #TOC {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 82vw;
+    max-width: 340px;
+    height: 100vh;
+    z-index: 130;
+    transform: translateX(-105%);
+    transition: transform .22s ease;
+    border-right: 1px solid var(--border);
+    box-shadow: 0 0 30px rgba(0,0,0,.5);
+  }
+  #TOC.open { transform: translateX(0); }
+
+  #toc-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    background: rgba(0,0,0,.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .22s ease;
+  }
+  #toc-backdrop.open { opacity: 1; pointer-events: auto; }
+
+  main { padding: 14px 14px 120px; margin-top: 54px; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 17px; }
+  table { font-size: 12.5px; }
+  th, td { padding: 4px 6px; }
+}
+
+/* ссылка на страницу фактов на главной */
+.facts-nav { margin: 0 0 18px; font-size: 14px; }
+.facts-nav a { color: var(--accent); text-decoration: none; }
+.facts-nav a:hover { text-decoration: underline; }
+
+/* страница фактов: абзацы-факты как карточки */
+main > p > strong:first-child { color: var(--text); }
+
+/* ---------- оглавление в начале документа ---------- */
+#оглавление + ul { list-style: none; padding-left: 0; }
+#оглавление + ul > li { margin-top: 14px; }
+#оглавление + ul > li > a { font-size: 16px; }
+#оглавление + ul ul { list-style: disc; padding-left: 26px; }
+#оглавление + ul ul li::marker { color: var(--accent); }
