@@ -321,18 +321,61 @@ clean = lambda t: re.sub(r'\s+', ' ', re.sub(r'<[^>]+>|&nbsp;', ' ', t)).strip()
 
 N = 300
 
+def parse_table(tbl):
+    """html-таблица из вопроса -> список строк со списками ячеек"""
+    rows = []
+    for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', tbl, flags=re.S):
+        cells = [clean(c) for c in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', tr, flags=re.S)]
+        if any(cells):
+            rows.append(cells)
+    return rows
+
+def render_q(txt):
+    """текст вопроса -> html: текст эскейпится, таблицы штрафов -> .pt"""
+    out = []
+    for part in re.split(r'(<table[^>]*>.*?</table>)', txt, flags=re.S):
+        if part.startswith('<table'):
+            r = parse_table(part)
+            if r:
+                body = ''.join('<tr>' + ''.join(f'<td>{html.escape(c)}</td>' for c in row) + '</tr>' for row in r)
+                out.append(f'<table class="pt">{body}</table>')
+        else:
+            t = clean(part)
+            if t:
+                out.append(html.escape(t))
+    return ' '.join(out)
+
+def render_q_md(txt):
+    out = []
+    for part in re.split(r'(<table[^>]*>.*?</table>)', txt, flags=re.S):
+        if part.startswith('<table'):
+            r = parse_table(part)
+            if r:
+                w = max(len(x) for x in r)
+                header = r[0] + [''] * (w - len(r[0]))
+                out.append('| ' + ' | '.join(header) + ' |')
+                out.append('| ' + ' | '.join('---' for _ in range(w)) + ' |')
+                for row in r[1:]:
+                    row = row + [''] * (w - len(row))
+                    out.append('| ' + ' | '.join(row) + ' |')
+        else:
+            t = clean(part)
+            if t:
+                out.append(t)
+    return '\n\n'.join(out)
+
 rows = []
 md = ["# Правильные ответы — база вопросов referees.fhr.ru",
       "", f"Вопросы 1–{len(ANSWERS)} из {len(ACT)} активных · порядок = порядок в базе",
       ""]
 for i, q in enumerate(ACT[:N], 1):
     ans, rule = ANSWERS[i]
-    text = html.escape(clean(q['text']))
+    text = render_q(q['text'])
     rows.append(
-        f'<section class="q" id="q{i}"><h3>{i}. {text}</h3>'
+        f'<section class="q" id="q{i}"><div class="qtext"><b>{i}.</b> {text}</div>'
         f'<p class="ans">✅ {html.escape(ans)}</p>'
         f'<p class="rule">{html.escape(rule)} · id {q["id"]}</p></section>')
-    md.append(f"## {i}. {clean(q['text'])}")
+    md.append(f"## {i}. {render_q_md(q['text'])}")
     md.append(f"**Ответ:** {ans}  ")
     md.append(f"_{rule}_\n")
 
@@ -347,9 +390,13 @@ page = f"""<!DOCTYPE html>
 <style>
 body{{display:block}} main{{max-width:760px;margin:64px auto 40px;padding:0 16px}}
 .q{{border-bottom:1px solid var(--border);padding:14px 0}}
-.q h3{{font-size:14.5px;font-weight:600;margin:0 0 8px}}
+.qtext{{font-size:14.5px;margin:0 0 8px}}
 .ans{{color:#7ee2a8;margin:0 0 4px}}
 .rule{{color:var(--fg-dim);font-size:12.5px;margin:0}}
+table.pt{{border-collapse:collapse;margin:10px 0 4px;width:100%}}
+table.pt td{{border:1px solid var(--border);padding:6px 10px;font-size:13px;
+  text-align:center;vertical-align:middle}}
+table.pt tr:first-child td{{background:var(--bg-3);font-weight:600;color:var(--fg)}}
 nav#TOC{{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);overflow:auto;
   background:var(--bg-2);border-right:1px solid var(--border);padding:56px 8px 16px}}
 nav#TOC li{{list-style:none}} nav#TOC a{{display:block;padding:4px 10px;color:var(--fg-dim);
