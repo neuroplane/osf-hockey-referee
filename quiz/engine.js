@@ -16,7 +16,10 @@
         if (m.logged) {
           holder.innerHTML = '';
           var n = document.createElement('span');
-          n.className = 'uname'; n.textContent = m.name;
+          n.className = 'uname'; n.title = m.name;
+          n.textContent = m.name.split(/\s+/).map(function (w) {
+            return w ? w[0].toUpperCase() + '.' : '';
+          }).join('');
           var out = document.createElement('a');
           out.className = 'back'; out.href = '#'; out.textContent = 'выйти';
           out.addEventListener('click', function (e) {
