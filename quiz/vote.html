@@ -114,7 +114,15 @@
     });
   });
 
-  QUIZ.initAuth(document.getElementById('auth'), function (u) { logged = !!u; load(); });
+  QUIZ.initAuth(document.getElementById('auth'), function (u) {
+    logged = !!u;
+    if (!u) {
+      list.innerHTML = '<div class="empty">Голосование только для залогиненных — ' +
+        '<a href="' + QUIZ.API + '/auth/yandex" style="color:var(--accent)">войти через Яндекс</a></div>';
+      return;
+    }
+    load();
+  });
 })();
 </script>
 </body>
