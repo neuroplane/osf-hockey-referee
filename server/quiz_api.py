@@ -298,24 +298,32 @@ def daily_score(body: DailyScore, req: Request):
     u = current_user(req)
     if not u:
         return JSONResponse({"error": "нужно войти"}, status_code=401)
-    today = date.today()
-    today_id = today.year * 10000 + today.month * 100 + today.day
-    if body.day != today_id:
-        return JSONResponse({"error": "очки принимаются только за сегодня"}, status_code=400)
+    day = today_id()  # день всегда серверный — часы клиента роли не играют
     with closing(db()) as con:
         try:
             con.execute(
                 "INSERT INTO daily_scores (user_id, day, score, right_cnt, ts) VALUES (%s,%s,%s,%s,%s)",
-                (u["id"], body.day, body.score, body.right, int(time.time())))
+                (u["id"], day, body.score, body.right, int(time.time())))
         except psycopg.errors.UniqueViolation:
             return JSONResponse({"error": "результат за сегодня уже записан"}, status_code=409)
         for a in body.answers:
             con.execute(
                 "INSERT INTO daily_answers (user_id, day, qn, ok, secs) VALUES (%s,%s,%s,%s,%s) "
                 "ON CONFLICT (user_id, day, qn) DO NOTHING",
-                (u["id"], body.day, a.qn, a.ok, a.secs))
+                (u["id"], day, a.qn, a.ok, a.secs))
         con.commit()
     return {"ok": True}
+
+
+def today_id():
+    t = date.today()
+    return t.year * 10000 + t.month * 100 + t.day
+
+
+@app.get("/daily/today")
+def daily_today():
+    """Серверный день — единственный источник правды для игры дня."""
+    return {"day": today_id()}
 
 
 @app.get("/daily/me")

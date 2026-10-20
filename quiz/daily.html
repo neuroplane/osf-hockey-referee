@@ -66,21 +66,36 @@
 (function () {
   var DAY_MS = 86400000;
   var now = new Date();
-  var dateStr = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  // день — только серверный: часы на устройстве игрока могут врать
   var dayId = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
   var LS_RES = 'quiz_daily_' + dayId;
   var LS_STREAK = 'quiz_daily_streak';
+  var saved = null, yId = 0;
 
   function el(id) { return document.getElementById(id); }
-  el('today').textContent = dateStr;
+  el('today').textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
 
-  var saved = null;
+  function loadServerDay() {
+    return fetch(QUIZ.API + '/daily/today')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        dayId = d.day;
+        LS_RES = 'quiz_daily_' + dayId;
+        var t = new Date(Math.floor(dayId / 10000), Math.floor(dayId / 100) % 100 - 1, dayId % 100);
+        el('today').textContent = t.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+      }).catch(function () {})
+      .then(function () {
+        try { saved = JSON.parse(localStorage.getItem(LS_RES)); } catch (e) {}
+        var y = new Date(Math.floor(dayId / 10000), Math.floor(dayId / 100) % 100 - 1, dayId % 100 - 1);
+        yId = y.getFullYear() * 10000 + (y.getMonth() + 1) * 100 + y.getDate();
+      });
+  }
   try { saved = JSON.parse(localStorage.getItem(LS_RES)); } catch (e) {}
 
   var streak = { count: 0, last: 0 };
   try { streak = JSON.parse(localStorage.getItem(LS_STREAK)) || streak; } catch (e) {}
   var yesterday = new Date(now.getTime() - DAY_MS);
-  var yId = yesterday.getFullYear() * 10000 + (yesterday.getMonth() + 1) * 100 + yesterday.getDate();
+  yId = yesterday.getFullYear() * 10000 + (yesterday.getMonth() + 1) * 100 + yesterday.getDate();
 
   var qs, idx = 0, total = 0, right = 0, mistakes = [], answers = [], cardRef, tStart, tInt;
   var user = null;
@@ -189,28 +204,30 @@
   }
 
   QUIZ.load('', function () {
-    if (saved) {
-      el('start-btn').style.display = 'none';
-      el('played-note').textContent = 'Сегодня уже сыграно. Возвращайся завтра!';
-      showFinal(saved);
-      // сверка с сервером: счёт мог быть пересчитан
-      fetch(QUIZ.API + '/daily/me', { credentials: 'same-origin' })
-        .then(function (r) { return r.json(); })
-        .then(function (m) {
-          if (m.score != null && m.score !== saved.score) {
-            saved.score = m.score;
-            el('res-big').textContent = m.score + ' очков';
-            try { localStorage.setItem(LS_RES, JSON.stringify(saved)); } catch (e) {}
-          }
-        }).catch(function () {});
-      return;
-    }
-    qs = pickDay(QUIZ.dailyPool());
-    el('start-btn').addEventListener('click', function () {
-      if (!user) { location.href = QUIZ.API + '/auth/yandex'; return; }
-      el('intro').style.display = 'none';
-      el('card').style.display = '';
-      render();
+    loadServerDay().then(function () {
+      if (saved) {
+        el('start-btn').style.display = 'none';
+        el('played-note').textContent = 'Сегодня уже сыграно. Возвращайся завтра!';
+        showFinal(saved);
+        // сверка с сервером: счёт мог быть пересчитан
+        fetch(QUIZ.API + '/daily/me', { credentials: 'same-origin' })
+          .then(function (r) { return r.json(); })
+          .then(function (m) {
+            if (m.score != null && m.score !== saved.score) {
+              saved.score = m.score;
+              el('res-big').textContent = m.score + ' очков';
+              try { localStorage.setItem(LS_RES, JSON.stringify(saved)); } catch (e) {}
+            }
+          }).catch(function () {});
+        return;
+      }
+      qs = pickDay(QUIZ.dailyPool());
+      el('start-btn').addEventListener('click', function () {
+        if (!user) { location.href = QUIZ.API + '/auth/yandex'; return; }
+        el('intro').style.display = 'none';
+        el('card').style.display = '';
+        render();
+      });
     });
   });
 
@@ -219,7 +236,7 @@
     if (idx >= qs.length) finish(); else render();
   });
   el('share').addEventListener('click', function () {
-    var txt = '«Вброс по борту», ' + now.toLocaleDateString('ru-RU') + ': ' +
+    var txt = '«Вброс по борту», ' + el('today').textContent + ': ' +
       el('res-big').textContent + ', ' + el('res-sub').textContent + ', ' + el('res-streak').textContent +
       ' — https://sport.tgbsrv.ru/referee/quiz/daily.html';
     navigator.clipboard.writeText(txt).then(function () {
