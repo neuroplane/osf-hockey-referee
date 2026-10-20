@@ -97,7 +97,7 @@
   var yesterday = new Date(now.getTime() - DAY_MS);
   yId = yesterday.getFullYear() * 10000 + (yesterday.getMonth() + 1) * 100 + yesterday.getDate();
 
-  var qs, idx = 0, total = 0, right = 0, mistakes = [], answers = [], cardRef, tStart, tInt;
+  var qs, idx = 0, total = 0, right = 0, mistakes = [], answers = [], cardRef, tStart, tInt, advTimer;
   var user = null;
   QUIZ.initAuth(document.getElementById('auth'), function (u) {
     user = u;
@@ -201,6 +201,14 @@
 
   function timeout() {
     if (cardRef) cardRef.pick(-1);
+    clearTimeout(advTimer);
+    advTimer = setTimeout(advance, 3000);
+  }
+
+  function advance() {
+    clearTimeout(advTimer);
+    idx++;
+    if (idx >= qs.length) finish(); else render();
   }
 
   QUIZ.load('', function () {
@@ -231,10 +239,7 @@
     });
   });
 
-  el('next-btn').addEventListener('click', function () {
-    idx++;
-    if (idx >= qs.length) finish(); else render();
-  });
+  el('next-btn').addEventListener('click', advance);
   el('share').addEventListener('click', function () {
     var txt = '«Вброс по борту», ' + el('today').textContent + ': ' +
       el('res-big').textContent + ', ' + el('res-sub').textContent + ', ' + el('res-streak').textContent +

@@ -117,7 +117,9 @@
         else b.classList.add('dim');
       });
       fb.className = 'feedback show';
-      fb.innerHTML = (ok ? '<b style="color:#8fe3ae">Верно.</b> ' : '<b style="color:#f0a49e">Неверно.</b> ') +
+      var lead = ok ? '<b style="color:#8fe3ae">Верно.</b> ' :
+        i === -1 ? '<b style="color:#f0a49e">Время вышло.</b> ' : '<b style="color:#f0a49e">Неверно.</b> ';
+      fb.innerHTML = lead +
         'Правильный ответ: <b>' + q.opts[q.correct] + '</b>' +
         (q.rule ? '<div class="rule">' + q.rule + '</div>' : '');
       onAnswer(ok, i);
