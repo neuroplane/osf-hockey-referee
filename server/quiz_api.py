@@ -3,7 +3,7 @@
 
 Конфиг — переменные окружения (см. /opt/quiz-api/.env на сервере):
   YANDEX_CLIENT_ID, YANDEX_CLIENT_SECRET — приложение на oauth.yandex.ru
-  DB_PATH — путь к sqlite (default: ./quiz.db)
+  DATABASE_URL — postgres DSN (default: postgresql://quiz:quiz@127.0.0.1:5434/quiz)
   BASE_URL — публичный базовый путь API (default: /referee/api)
   SITE_URL — https://sport.tgbsrv.ru
   VOTE_THRESHOLD — порог голосов для approve/reject (default: 5)
@@ -12,19 +12,20 @@ import json
 import os
 import re
 import secrets
-import sqlite3
 import time
 from contextlib import closing
 from datetime import date
 
 import httpx
+import psycopg
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
+from psycopg.rows import dict_row
 from pydantic import BaseModel, Field
 
 CLIENT_ID = os.environ.get("YANDEX_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("YANDEX_CLIENT_SECRET", "")
-DB_PATH = os.environ.get("DB_PATH", "quiz.db")
+DSN = os.environ.get("DATABASE_URL", "postgresql://quiz:quiz@127.0.0.1:5434/quiz")
 SITE_URL = os.environ.get("SITE_URL", "https://sport.tgbsrv.ru")
 BASE_URL = os.environ.get("BASE_URL", "/referee/api")
 THRESHOLD = int(os.environ.get("VOTE_THRESHOLD", "5"))
@@ -35,29 +36,26 @@ app = FastAPI(docs_url=None, redoc_url=None)
 
 
 def db():
-    con = sqlite3.connect(DB_PATH)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA journal_mode=WAL")
-    return con
+    return psycopg.connect(DSN, row_factory=dict_row)
 
 
 def init_db():
     with closing(db()) as con:
-        con.executescript("""
+        con.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
+            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             yandex_id TEXT UNIQUE NOT NULL,
             login TEXT,
             name TEXT NOT NULL,
-            created INTEGER NOT NULL
+            created BIGINT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),
-            expires INTEGER NOT NULL
+            expires BIGINT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS proposals (
-            id INTEGER PRIMARY KEY,
+            id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id),
             text TEXT NOT NULL,
             opts TEXT NOT NULL,
@@ -65,7 +63,7 @@ def init_db():
             rule TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'pending',
             score INTEGER NOT NULL DEFAULT 0,
-            created INTEGER NOT NULL
+            created BIGINT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS votes (
             user_id INTEGER NOT NULL REFERENCES users(id),
@@ -77,11 +75,20 @@ def init_db():
             user_id INTEGER NOT NULL REFERENCES users(id),
             day INTEGER NOT NULL,
             score INTEGER NOT NULL,
-            right INTEGER NOT NULL,
-            ts INTEGER NOT NULL,
+            right_cnt INTEGER NOT NULL,
+            ts BIGINT NOT NULL,
             UNIQUE (user_id, day)
         );
+        CREATE TABLE IF NOT EXISTS daily_answers (
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            day INTEGER NOT NULL,
+            qn INTEGER NOT NULL,
+            ok BOOLEAN NOT NULL,
+            secs REAL NOT NULL,
+            UNIQUE (user_id, day, qn)
+        );
         """)
+        con.commit()
 
 
 init_db()
@@ -94,15 +101,8 @@ def current_user(req: Request):
     with closing(db()) as con:
         row = con.execute(
             "SELECT u.id, u.name, u.login FROM sessions s JOIN users u ON u.id=s.user_id "
-            "WHERE s.token=? AND s.expires>?", (token, int(time.time()))).fetchone()
-        return dict(row) if row else None
-
-
-def need_user(req: Request):
-    u = current_user(req)
-    if not u:
-        return None
-    return u
+            "WHERE s.token=%s AND s.expires>%s", (token, int(time.time()))).fetchone()
+        return row
 
 
 @app.get("/me")
@@ -142,12 +142,12 @@ async def auth_callback(code: str, resp: Response):
     now = int(time.time())
     with closing(db()) as con:
         con.execute(
-            "INSERT INTO users (yandex_id, login, name, created) VALUES (?,?,?,?) "
+            "INSERT INTO users (yandex_id, login, name, created) VALUES (%s,%s,%s,%s) "
             "ON CONFLICT(yandex_id) DO UPDATE SET login=excluded.login, name=excluded.name",
             (yid, login, name, now))
-        uid = con.execute("SELECT id FROM users WHERE yandex_id=?", (yid,)).fetchone()["id"]
+        uid = con.execute("SELECT id FROM users WHERE yandex_id=%s", (yid,)).fetchone()["id"]
         token = secrets.token_urlsafe(32)
-        con.execute("INSERT INTO sessions (token, user_id, expires) VALUES (?,?,?)",
+        con.execute("INSERT INTO sessions (token, user_id, expires) VALUES (%s,%s,%s)",
                     (token, uid, now + SESSION_TTL))
         con.commit()
     r = RedirectResponse("/referee/quiz/", status_code=303)
@@ -161,7 +161,7 @@ def logout(req: Request, resp: Response):
     token = req.cookies.get("vb_session")
     if token:
         with closing(db()) as con:
-            con.execute("DELETE FROM sessions WHERE token=?", (token,))
+            con.execute("DELETE FROM sessions WHERE token=%s", (token,))
             con.commit()
     r = JSONResponse({"ok": True})
     r.delete_cookie("vb_session")
@@ -177,7 +177,7 @@ class Proposal(BaseModel):
 
 @app.post("/propose")
 def propose(body: Proposal, req: Request):
-    u = need_user(req)
+    u = current_user(req)
     if not u:
         return JSONResponse({"error": "нужно войти"}, status_code=401)
     opts = [o.strip() for o in body.opts]
@@ -186,17 +186,18 @@ def propose(body: Proposal, req: Request):
     if not re.search(r"\d", body.rule):
         return JSONResponse({"error": "нужна ссылка на пункт правил (с номером)"}, status_code=400)
     with closing(db()) as con:
-        n = con.execute("SELECT COUNT(*) c FROM proposals WHERE user_id=? AND status='pending'",
+        n = con.execute("SELECT COUNT(*) c FROM proposals WHERE user_id=%s AND status='pending'",
                         (u["id"],)).fetchone()["c"]
         if n >= 10:
             return JSONResponse({"error": "лимит: 10 вопросов на голосовании одновременно"},
                                 status_code=429)
-        cur = con.execute(
-            "INSERT INTO proposals (user_id, text, opts, correct, rule, created) VALUES (?,?,?,?,?,?)",
+        row = con.execute(
+            "INSERT INTO proposals (user_id, text, opts, correct, rule, created) "
+            "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
             (u["id"], body.text.strip(), json.dumps(opts, ensure_ascii=False),
-             body.correct, body.rule.strip(), int(time.time())))
+             body.correct, body.rule.strip(), int(time.time()))).fetchone()
         con.commit()
-        return {"ok": True, "id": cur.lastrowid}
+        return {"ok": True, "id": row["id"]}
 
 
 @app.get("/proposals")
@@ -207,9 +208,9 @@ def proposals(req: Request, status: str = "pending"):
     with closing(db()) as con:
         rows = con.execute(
             "SELECT p.id, p.user_id, p.text, p.opts, p.correct, p.rule, p.score, p.created, "
-            "u.name AS author, (SELECT v.value FROM votes v WHERE v.proposal_id=p.id AND v.user_id=?) AS my "
+            "u.name AS author, (SELECT v.value FROM votes v WHERE v.proposal_id=p.id AND v.user_id=%s) AS my "
             "FROM proposals p JOIN users u ON u.id=p.user_id "
-            "WHERE p.status=? ORDER BY p.created DESC LIMIT 100",
+            "WHERE p.status=%s ORDER BY p.created DESC LIMIT 100",
             (u["id"] if u else -1, status)).fetchall()
     return {"items": [{
         "id": r["id"], "text": r["text"], "opts": json.loads(r["opts"]),
@@ -225,47 +226,54 @@ class Vote(BaseModel):
 
 @app.post("/vote")
 def vote(body: Vote, req: Request):
-    u = need_user(req)
+    u = current_user(req)
     if not u:
         return JSONResponse({"error": "нужно войти"}, status_code=401)
     with closing(db()) as con:
-        p = con.execute("SELECT user_id, status FROM proposals WHERE id=?",
+        p = con.execute("SELECT user_id, status FROM proposals WHERE id=%s",
                         (body.proposal_id,)).fetchone()
         if not p or p["status"] != "pending":
             return JSONResponse({"error": "вопрос недоступен для голосования"}, status_code=400)
         if p["user_id"] == u["id"]:
             return JSONResponse({"error": "нельзя голосовать за свой вопрос"}, status_code=400)
-        old = con.execute("SELECT value FROM votes WHERE user_id=? AND proposal_id=?",
+        old = con.execute("SELECT value FROM votes WHERE user_id=%s AND proposal_id=%s",
                           (u["id"], body.proposal_id)).fetchone()
         delta = body.value - (old["value"] if old else 0)
         if body.value == 0:
-            con.execute("DELETE FROM votes WHERE user_id=? AND proposal_id=?",
+            con.execute("DELETE FROM votes WHERE user_id=%s AND proposal_id=%s",
                         (u["id"], body.proposal_id))
         else:
             con.execute(
-                "INSERT INTO votes (user_id, proposal_id, value) VALUES (?,?,?) "
+                "INSERT INTO votes (user_id, proposal_id, value) VALUES (%s,%s,%s) "
                 "ON CONFLICT(user_id, proposal_id) DO UPDATE SET value=excluded.value",
                 (u["id"], body.proposal_id, body.value))
-        con.execute("UPDATE proposals SET score=score+? WHERE id=?", (delta, body.proposal_id))
-        score = con.execute("SELECT score FROM proposals WHERE id=?",
+        con.execute("UPDATE proposals SET score=score+%s WHERE id=%s", (delta, body.proposal_id))
+        score = con.execute("SELECT score FROM proposals WHERE id=%s",
                             (body.proposal_id,)).fetchone()["score"]
         if score >= THRESHOLD:
-            con.execute("UPDATE proposals SET status='approved' WHERE id=?", (body.proposal_id,))
+            con.execute("UPDATE proposals SET status='approved' WHERE id=%s", (body.proposal_id,))
         elif score <= -THRESHOLD:
-            con.execute("UPDATE proposals SET status='rejected' WHERE id=?", (body.proposal_id,))
+            con.execute("UPDATE proposals SET status='rejected' WHERE id=%s", (body.proposal_id,))
         con.commit()
     return {"ok": True, "score": score}
+
+
+class AnswerRec(BaseModel):
+    qn: int
+    ok: bool
+    secs: float = Field(ge=0, le=600)
 
 
 class DailyScore(BaseModel):
     day: int
     score: int = Field(ge=0, le=2000)
     right: int = Field(ge=0, le=10)
+    answers: list[AnswerRec] = []
 
 
 @app.post("/daily/score")
 def daily_score(body: DailyScore, req: Request):
-    u = need_user(req)
+    u = current_user(req)
     if not u:
         return JSONResponse({"error": "нужно войти"}, status_code=401)
     today = date.today()
@@ -274,10 +282,16 @@ def daily_score(body: DailyScore, req: Request):
         return JSONResponse({"error": "очки принимаются только за сегодня"}, status_code=400)
     with closing(db()) as con:
         try:
-            con.execute("INSERT INTO daily_scores (user_id, day, score, right, ts) VALUES (?,?,?,?,?)",
-                        (u["id"], body.day, body.score, body.right, int(time.time())))
-        except sqlite3.IntegrityError:
+            con.execute(
+                "INSERT INTO daily_scores (user_id, day, score, right_cnt, ts) VALUES (%s,%s,%s,%s,%s)",
+                (u["id"], body.day, body.score, body.right, int(time.time())))
+        except psycopg.errors.UniqueViolation:
             return JSONResponse({"error": "результат за сегодня уже записан"}, status_code=409)
+        for a in body.answers:
+            con.execute(
+                "INSERT INTO daily_answers (user_id, day, qn, ok, secs) VALUES (%s,%s,%s,%s,%s) "
+                "ON CONFLICT (user_id, day, qn) DO NOTHING",
+                (u["id"], body.day, a.qn, a.ok, a.secs))
         con.commit()
     return {"ok": True}
 
@@ -289,14 +303,31 @@ def leaderboard(day: int = 0):
         day = t.year * 10000 + t.month * 100 + t.day
     with closing(db()) as con:
         rows = con.execute(
-            "SELECT u.name, d.score, d.right, d.ts FROM daily_scores d "
-            "JOIN users u ON u.id=d.user_id WHERE d.day=? "
+            "SELECT u.name, d.score, d.right_cnt, d.ts FROM daily_scores d "
+            "JOIN users u ON u.id=d.user_id WHERE d.day=%s "
             "ORDER BY d.score DESC, d.ts ASC LIMIT 20", (day,)).fetchall()
-        total = con.execute("SELECT COUNT(*) c FROM daily_scores WHERE day=?", (day,)).fetchone()["c"]
+        total = con.execute("SELECT COUNT(*) c FROM daily_scores WHERE day=%s", (day,)).fetchone()["c"]
     return {"day": day, "players": total,
-            "items": [{"name": r["name"], "score": r["score"], "right": r["right"]} for r in rows]}
+            "items": [{"name": r["name"], "score": r["score"], "right": r["right_cnt"]} for r in rows]}
+
+
+@app.get("/stats/questions")
+def question_stats(day: int = 0):
+    """Статистика по вопросам дня: попыток, % верных, среднее время."""
+    if not day:
+        t = date.today()
+        day = t.year * 10000 + t.month * 100 + t.day
+    with closing(db()) as con:
+        rows = con.execute(
+            "SELECT qn, COUNT(*) AS tries, "
+            "ROUND(100.0 * SUM(ok::int) / COUNT(*), 1) AS right_pct, "
+            "ROUND(AVG(secs)::numeric, 1) AS avg_secs "
+            "FROM daily_answers WHERE day=%s GROUP BY qn ORDER BY right_pct ASC", (day,)).fetchall()
+    return {"day": day, "items": [dict(r) for r in rows]}
 
 
 @app.get("/health")
 def health():
+    with closing(db()) as con:
+        con.execute("SELECT 1")
     return {"ok": True}

@@ -82,7 +82,7 @@
   var yesterday = new Date(now.getTime() - DAY_MS);
   var yId = yesterday.getFullYear() * 10000 + (yesterday.getMonth() + 1) * 100 + yesterday.getDate();
 
-  var qs, idx = 0, total = 0, right = 0, mistakes = [], cardRef, tStart, tInt;
+  var qs, idx = 0, total = 0, right = 0, mistakes = [], answers = [], cardRef, tStart, tInt;
   var user = null;
   QUIZ.initAuth(document.getElementById('auth'), function (u) {
     user = u;
@@ -149,7 +149,7 @@
       fetch(QUIZ.API + '/daily/score', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: dayId, score: scoreNow, right: right })
+        body: JSON.stringify({ day: dayId, score: scoreNow, right: right, answers: answers })
       }).catch(function () {});
     }
     showFinal(res);
@@ -177,6 +177,7 @@
       clearInterval(tInt);
       var secs = (Date.now() - tStart) / 1000;
       var bonus = ok ? Math.max(0, 50 - Math.floor(secs / 3) * 5) : 0;
+      answers.push({ qn: q.n, ok: ok, secs: Math.round(secs * 10) / 10 });
       if (ok) { total += 100 + bonus; right++; }
       else mistakes.push(q);
       el('score').innerHTML = 'Очки: <b>' + total + '</b>' + (bonus ? ' (+' + bonus + ')' : '');
