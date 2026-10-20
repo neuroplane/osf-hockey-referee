@@ -22,7 +22,7 @@ scp -o BatchMode=yes fhr_questions/index.html "tgbsrv:$DEST/db/index.html"
 scp -o BatchMode=yes fhr_questions/questions/index.html "tgbsrv:$DEST/questions/index.html"
 scp -o BatchMode=yes fhr_questions/trainer/index.html "tgbsrv:$DEST/trainer/"
 scp -o BatchMode=yes \
-  quiz/index.html quiz/daily.html quiz/propose.html quiz/vote.html \
+  quiz/index.html quiz/trainer.html quiz/daily.html quiz/propose.html quiz/vote.html \
   quiz/engine.css quiz/engine.js \
   "tgbsrv:$DEST/quiz/"
 scp -o BatchMode=yes quiz/data/*.js "tgbsrv:$DEST/quiz/data/"

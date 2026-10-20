@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="revision" content="191026">
+<title>Тренажёр — Вброс по борту</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="daily.html">Игра дня</a>
+  <a class="back" href="vote.html">Голосование</a>
+  <a class="back" href="propose.html">+ Вопрос</a>
+  <div id="progress-wrap"><div id="progress"></div></div>
+  <span id="score"></span>
+  <span id="auth"></span>
+</div>
+<main>
+  <div class="setbar" id="setbar"></div>
+  <div class="toolbar">
+    <label><input type="checkbox" id="shuffle"> перемешать</label>
+    <span id="pos"></span>
+  </div>
+  <div class="qcard" id="card">
+    <div class="qnum"></div>
+    <p class="qtext"></p>
+    <div class="qmedia"></div>
+    <div class="opts"></div>
+    <div class="feedback"></div>
+    <button id="next-btn">Дальше →</button>
+  </div>
+  <div class="result" id="result">
+    <h2>Прогон завершён</h2>
+    <div class="big" id="res-big"></div>
+    <div class="sub" id="res-sub"></div>
+    <div id="mistakes"></div>
+    <button class="primary" id="restart">Ещё раз</button>
+    <button id="retry-mistakes">Повторить ошибки</button>
+  </div>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var card = document.getElementById('card');
+  var next = document.getElementById('next-btn');
+  var logged = false;
+  QUIZ.initAuth(document.getElementById('auth'), function (u) {
+    logged = !!u;
+    if (!u) QUIZ.gate('Тренажёр открыт только для залогиненных судей.');
+  });
+  var order = [], idx = 0, score = 0, mistakes = [], currentSet = null;
+
+  function el(id) { return document.getElementById(id); }
+
+  function render() {
+    var q = order[idx];
+    el('pos').textContent = 'Вопрос ' + (idx + 1) + ' из ' + order.length;
+    el('score').innerHTML = 'Верно: <b>' + score + '</b>';
+    el('progress').style.width = (idx / order.length * 100) + '%';
+    next.classList.remove('show');
+    QUIZ.renderCard(card, q, function (ok) {
+      if (ok) score++; else mistakes.push(q);
+      el('score').innerHTML = 'Верно: <b>' + score + '</b>';
+      next.classList.add('show');
+    });
+  }
+
+  function start(list) {
+    order = list; idx = 0; score = 0; mistakes = [];
+    card.style.display = '';
+    el('result').classList.remove('show');
+    document.querySelector('.toolbar').style.display = '';
+    render();
+  }
+
+  function begin() {
+    var list = currentSet.questions.slice();
+    if (el('shuffle').checked) list = QUIZ.shuffle(list);
+    start(list);
+  }
+
+  next.addEventListener('click', function () {
+    idx++;
+    if (idx >= order.length) {
+      card.style.display = 'none';
+      document.querySelector('.toolbar').style.display = 'none';
+      el('progress').style.width = '100%';
+      el('res-big').textContent = score + ' / ' + order.length;
+      el('res-sub').textContent = Math.round(score / order.length * 100) + '% верных' +
+        (mistakes.length ? ' · ошибок: ' + mistakes.length : '');
+      QUIZ.renderMistakes(el('mistakes'), mistakes);
+      el('retry-mistakes').style.display = mistakes.length ? '' : 'none';
+      el('result').classList.add('show');
+    } else render();
+  });
+
+  el('restart').addEventListener('click', begin);
+  el('retry-mistakes').addEventListener('click', function () { start(QUIZ.shuffle(mistakes)); });
+  el('shuffle').addEventListener('change', begin);
+
+  QUIZ.load('', function () {
+    if (!logged) return;
+    var bar = el('setbar');
+    QUIZ.sets().forEach(function (s) {
+      var b = document.createElement('button');
+      b.className = 'chip';
+      b.textContent = s.title + ' (' + s.questions.length + ')';
+      b.addEventListener('click', function () {
+        bar.querySelectorAll('.chip').forEach(function (c) { c.classList.remove('on'); });
+        b.classList.add('on');
+        currentSet = s;
+        begin();
+      });
+      bar.appendChild(b);
+    });
+    var first = bar.querySelector('.chip');
+    if (first) first.click();
+  });
+})();
+</script>
+</body>
+</html>
