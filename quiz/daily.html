@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="revision" content="191026">
+<title>Игра дня — вопросы для судей</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+<style>
+.intro { text-align: center; padding: 30px 0 10px; }
+.intro h1 { font-size: 24px; margin: 0 0 8px; }
+.intro p { color: var(--fg-dim); font-size: 14.5px; margin: 6px 0; }
+.intro .rules-list { text-align: left; max-width: 400px; margin: 14px auto; color: var(--fg-dim); font-size: 13.5px; line-height: 1.6; }
+.intro button { margin-top: 18px; padding: 13px 34px; font-size: 16px; font-weight: 600; color: #10131a; background: var(--accent); border: none; border-radius: 10px; cursor: pointer; }
+.qpts { font-size: 13px; color: var(--fg-dim); }
+.qpts b { color: var(--accent); }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="./">← Тренажёр</a>
+  <a class="back" href="../">Правила</a>
+  <div id="progress-wrap"><div id="progress"></div></div>
+  <span id="score"></span>
+</div>
+<main>
+  <div class="intro" id="intro">
+    <h1>Игра дня</h1>
+    <p id="today"></p>
+    <div class="rules-list">
+      · 10 вопросов — у всех сегодня одинаковые<br>
+      · верный ответ: 100 очков<br>
+      · бонус за скорость: до +50 (тает за 30 сек)<br>
+      · идеальный день: +250<br>
+      · играй каждый день — растёт серия
+    </div>
+    <button id="start-btn">Играть</button>
+    <p id="played-note"></p>
+  </div>
+  <div class="qcard" id="card" style="display:none">
+    <div class="qnum"></div>
+    <div class="qpts" id="pts"></div>
+    <p class="qtext"></p>
+    <div class="qmedia"></div>
+    <div class="timerbar" id="timerbar"><div></div></div>
+    <div class="opts"></div>
+    <div class="feedback"></div>
+    <button id="next-btn">Дальше →</button>
+  </div>
+  <div class="result" id="result">
+    <h2>Результат дня</h2>
+    <div class="big" id="res-big"></div>
+    <div class="sub" id="res-sub"></div>
+    <div class="streak" id="res-streak"></div>
+    <div id="mistakes"></div>
+    <button class="primary" id="share">Скопировать результат</button>
+    <button id="again">Завтра будет новая игра</button>
+  </div>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var DAY_MS = 86400000;
+  var now = new Date();
+  var dateStr = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  var dayId = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  var LS_RES = 'quiz_daily_' + dayId;
+  var LS_STREAK = 'quiz_daily_streak';
+
+  function el(id) { return document.getElementById(id); }
+  el('today').textContent = dateStr;
+
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem(LS_RES)); } catch (e) {}
+
+  var streak = { count: 0, last: 0 };
+  try { streak = JSON.parse(localStorage.getItem(LS_STREAK)) || streak; } catch (e) {}
+  var yesterday = new Date(now.getTime() - DAY_MS);
+  var yId = yesterday.getFullYear() * 10000 + (yesterday.getMonth() + 1) * 100 + yesterday.getDate();
+
+  var qs, idx = 0, total = 0, right = 0, mistakes = [], cardRef, tStart, tInt;
+
+  function pickDay(pool) {
+    return QUIZ.seededShuffle(pool, dayId * 2654435761).slice(0, 10);
+  }
+
+  function streakAfter(scoreNow) {
+    var c = (streak.last === yId || streak.last === dayId) ? streak.count : 0;
+    return { count: c + (streak.last === dayId ? 0 : 1), last: dayId };
+  }
+
+  function showFinal(res) {
+    el('intro').style.display = 'none';
+    el('card').style.display = 'none';
+    el('progress').style.width = '100%';
+    el('res-big').textContent = res.score + ' очков';
+    el('res-sub').textContent = res.right + ' из 10 верных' + (res.perfect ? ' · идеальный день +250' : '');
+    el('res-streak').textContent = 'Серия: ' + res.streak + (res.streak === 1 ? ' день' : res.streak < 5 ? ' дня' : ' дней');
+    QUIZ.renderMistakes(el('mistakes'), res.mistakes);
+    el('result').classList.add('show');
+  }
+
+  function finish() {
+    var perfect = right === 10;
+    var st = streakAfter();
+    var scoreNow = total + (perfect ? 250 : 0);
+    var res = { score: scoreNow, right: right, perfect: perfect, streak: st.count, mistakes: mistakes };
+    try {
+      localStorage.setItem(LS_RES, JSON.stringify(res));
+      localStorage.setItem(LS_STREAK, JSON.stringify(st));
+    } catch (e) {}
+    showFinal(res);
+  }
+
+  function render() {
+    var q = qs[idx];
+    el('score').innerHTML = 'Очки: <b>' + total + '</b>';
+    el('progress').style.width = (idx / qs.length * 100) + '%';
+    el('next-btn').classList.remove('show');
+    el('pts').innerHTML = 'Вопрос ' + (idx + 1) + '/10 · верный: <b>100</b> + бонус скорости <b id="bon">50</b>';
+    var bar = el('timerbar'), inner = bar.firstElementChild;
+    inner.style.width = '100%'; bar.classList.remove('low');
+    tStart = Date.now();
+    clearInterval(tInt);
+    tInt = setInterval(function () {
+      var left = Math.max(0, 30000 - (Date.now() - tStart));
+      inner.style.width = (left / 300) + '%';
+      var bon = Math.max(0, 50 - Math.floor((30000 - left) / 1000 / 3) * 5);
+      var b = el('bon'); if (b) b.textContent = bon;
+      if (left <= 9000) bar.classList.add('low');
+      if (left <= 0) { clearInterval(tInt); timeout(); }
+    }, 100);
+    cardRef = QUIZ.renderCard(el('card'), q, function (ok) {
+      clearInterval(tInt);
+      var secs = (Date.now() - tStart) / 1000;
+      var bonus = ok ? Math.max(0, 50 - Math.floor(secs / 3) * 5) : 0;
+      if (ok) { total += 100 + bonus; right++; }
+      else mistakes.push(q);
+      el('score').innerHTML = 'Очки: <b>' + total + '</b>' + (bonus ? ' (+' + bonus + ')' : '');
+      el('next-btn').classList.add('show');
+    });
+  }
+
+  function timeout() {
+    if (cardRef) cardRef.pick(-1);
+  }
+
+  QUIZ.load('', function () {
+    if (saved) {
+      el('start-btn').style.display = 'none';
+      el('played-note').textContent = 'Сегодня уже сыграно. Возвращайся завтра!';
+      showFinal(saved);
+      return;
+    }
+    qs = pickDay(QUIZ.dailyPool());
+    el('start-btn').addEventListener('click', function () {
+      el('intro').style.display = 'none';
+      el('card').style.display = '';
+      render();
+    });
+  });
+
+  el('next-btn').addEventListener('click', function () {
+    idx++;
+    if (idx >= qs.length) finish(); else render();
+  });
+  el('share').addEventListener('click', function () {
+    var txt = 'Игра дня для судей, ' + now.toLocaleDateString('ru-RU') + ': ' +
+      el('res-big').textContent + ', ' + el('res-sub').textContent + ', ' + el('res-streak').textContent +
+      ' — https://sport.tgbsrv.ru/referee/quiz/daily.html';
+    navigator.clipboard.writeText(txt).then(function () {
+      el('share').textContent = 'Скопировано ✔';
+    });
+  });
+  el('again').addEventListener('click', function () {
+    el('result').classList.remove('show');
+    el('intro').style.display = '';
+    el('start-btn').style.display = 'none';
+    el('played-note').textContent = 'Новые вопросы — завтра.';
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+/* Общий движок тренажёра и игры дня */
+body { display: block; }
+main { max-width: 720px; margin: 0 auto; padding: 76px 16px 60px; }
+
+#topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--bg-2); border-bottom: 1px solid var(--border);
+}
+#topbar .back { color: var(--accent); text-decoration: none; font-size: 14px; white-space: nowrap; }
+#progress-wrap { flex: 1; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+#progress { height: 100%; width: 0; background: var(--accent); transition: width .25s; }
+#score { font-size: 14px; color: var(--fg-dim); white-space: nowrap; }
+#score b { color: var(--fg); }
+
+.setbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.setbar .chip {
+  font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer;
+  color: var(--fg-dim); background: var(--bg-3); border: 1px solid var(--border); border-radius: 999px;
+}
+.setbar .chip.on { color: #10131a; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+.toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; font-size: 13px; color: var(--fg-dim); }
+.toolbar label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+.qcard { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.qnum { color: var(--fg-dim); font-size: 13px; margin-bottom: 6px; }
+.qtext { font-size: 16px; line-height: 1.5; margin: 0 0 10px; }
+.qtext table.pt { border-collapse: collapse; margin: 12px 0 4px; width: 100%; }
+.qtext table.pt th, .qtext table.pt td { border: 1px solid var(--border); padding: 6px 10px; font-size: 13px; text-align: left; }
+.qtext table.pt th { background: var(--bg-3); }
+.qmedia { margin: 8px 0; }
+.qmedia a { color: var(--accent); font-size: 13px; margin-right: 12px; }
+
+.opts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.opt {
+  text-align: left; font: inherit; color: var(--fg); font-size: 14.5px; line-height: 1.45;
+  background: var(--bg-3); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; cursor: pointer;
+}
+.opt:hover:not(:disabled) { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt.correct { border-color: #4caf7d; background: #16301f; color: #8fe3ae; }
+.opt.wrong { border-color: #b0433a; background: #33191a; color: #f0a49e; }
+.opt.dim { opacity: .55; }
+
+.feedback { margin-top: 14px; font-size: 14px; display: none; }
+.feedback.show { display: block; }
+.feedback .rule { color: var(--fg-dim); font-size: 13px; margin-top: 6px; }
+#next-btn {
+  margin-top: 16px; width: 100%; padding: 13px; font-size: 15px; font-weight: 600;
+  color: #10131a; background: var(--accent); border: none; border-radius: 10px; cursor: pointer;
+  display: none;
+}
+#next-btn.show { display: block; }
+
+.timerbar { height: 4px; background: var(--bg-3); border-radius: 2px; margin: 10px 0 0; overflow: hidden; }
+.timerbar > div { height: 100%; background: var(--accent); transition: width .5s linear; }
+.timerbar.low > div { background: #b0433a; }
+
+.result { display: none; text-align: center; padding-top: 40px; }
+.result.show { display: block; }
+.result h2 { font-size: 22px; }
+.result .big { font-size: 42px; font-weight: 700; color: var(--accent); margin: 8px 0 4px; }
+.result .sub { color: var(--fg-dim); }
+.result .streak { margin-top: 10px; font-size: 15px; }
+#mistakes { text-align: left; margin: 24px 0; }
+#mistakes details { border-top: 1px solid var(--border); padding: 8px 0; }
+#mistakes summary { cursor: pointer; color: var(--fg); font-size: 14px; }
+#mistakes .ans { color: #8fe3ae; font-size: 13px; padding: 6px 0 2px; }
+#mistakes .rule { color: var(--fg-dim); font-size: 12.5px; }
+.result button {
+  margin: 8px 6px 0; padding: 11px 22px; font-size: 15px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
+  background: var(--bg-3); color: var(--fg);
+}
+.result button.primary { background: var(--accent); color: #10131a; border: none; }

@@ -6,9 +6,9 @@
 import json, re, random, pathlib, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-OUT = ROOT / 'trainer' / 'data.js'
 
 FR, TO = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (1, 100)
+OUT = ROOT / 'trainer' / (sys.argv[3] if len(sys.argv) > 3 else 'data.js')
 random.seed(42)
 
 txt = (ROOT / 'answers_1_1276.md').read_text()
@@ -73,6 +73,8 @@ qs = []
 for num in range(FR, TO + 1):
     if num not in items:
         continue
+    if items[num]['ans'].startswith('Смотреть'):
+        continue  # медиа-вопросы без текстового ответа — для тренажёра бесполезны
     q, body, ans, rule, media = (items[num][k] for k in ('q', 'body', 'ans', 'rule', 'media'))
     if is_yesno(ans):
         ds = [d for d in YESNO if d != ans and not d.startswith(ans.split(' ')[0])]
