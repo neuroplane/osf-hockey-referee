@@ -22,7 +22,7 @@
   <a class="back" href="board.html">Рейтинг</a>
   <a class="back" href="vote.html">Голосование</a>
   <a class="back" href="propose.html">+</a>
-  <div id="progress-wrap"><div id="progress"></div></div>
+  <div id="progress-wrap" style="display:none"><div id="progress"></div></div>
   <span id="score"></span>
   <span id="auth"></span>
 </div>
@@ -117,7 +117,7 @@
   function showFinal(res) {
     el('intro').style.display = 'none';
     el('card').style.display = 'none';
-    el('progress').style.width = '100%';
+    el('progress-wrap').style.display = 'none';
     el('res-big').textContent = res.score + ' очков';
     el('res-sub').textContent = res.right + ' из 10 верных' + (res.perfect ? ' · идеальный день +5' : '');
     el('res-streak').textContent = 'Серия: ' + res.streak + (res.streak === 1 ? ' день' : res.streak < 5 ? ' дня' : ' дней');
@@ -235,6 +235,7 @@
         if (!user) { location.href = QUIZ.API + '/auth/yandex'; return; }
         el('intro').style.display = 'none';
         el('card').style.display = '';
+        el('progress-wrap').style.display = '';
         render();
       });
     });
