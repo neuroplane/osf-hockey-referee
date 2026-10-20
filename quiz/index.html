@@ -18,11 +18,6 @@
   <span id="auth"></span>
 </div>
 <main>
-  <div id="gate" style="display:none;text-align:center;padding-top:60px">
-    <h2 style="font-size:20px">Вброс по борту</h2>
-    <p style="color:var(--fg-dim);font-size:14px">Тренажёр открыт только для залогиненных судей.</p>
-    <a id="gate-login" class="back" href="#" style="display:inline-block;margin-top:14px;padding:11px 26px;font-size:15px;font-weight:600;color:#10131a;background:var(--accent);border-radius:10px;text-decoration:none">Войти через Яндекс</a>
-  </div>
   <div class="setbar" id="setbar"></div>
   <div class="toolbar">
     <label><input type="checkbox" id="shuffle"> перемешать</label>
@@ -53,14 +48,7 @@
   var logged = false;
   QUIZ.initAuth(document.getElementById('auth'), function (u) {
     logged = !!u;
-    if (!u) {
-      el('setbar').style.display = 'none';
-      document.querySelector('.toolbar').style.display = 'none';
-      card.style.display = 'none';
-      var g = el('gate');
-      g.style.display = '';
-      g.querySelector('#gate-login').href = QUIZ.API + '/auth/yandex';
-    }
+    if (!u) QUIZ.gate('Тренажёр открыт только для залогиненных судей.');
   });
   var order = [], idx = 0, score = 0, mistakes = [], currentSet = null;
 

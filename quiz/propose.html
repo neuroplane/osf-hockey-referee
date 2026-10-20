@@ -59,8 +59,9 @@ button.submit { margin-top: 20px; padding: 13px 30px; font-size: 15px; font-weig
   var form = document.getElementById('form');
   var msg = document.getElementById('msg');
   QUIZ.initAuth(document.getElementById('auth'), function (u) {
-    form.style.display = u ? '' : 'none';
-    document.getElementById('need-login').style.display = u ? 'none' : '';
+    if (!u) { QUIZ.gate('Предлагать вопросы могут только залогиненные судьи.'); return; }
+    form.style.display = '';
+    document.getElementById('need-login').style.display = 'none';
   });
   form.addEventListener('submit', function (e) {
     e.preventDefault();

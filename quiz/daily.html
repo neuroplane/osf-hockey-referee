@@ -86,10 +86,7 @@
   var user = null;
   QUIZ.initAuth(document.getElementById('auth'), function (u) {
     user = u;
-    if (!u) {
-      el('start-btn').style.display = 'none';
-      el('played-note').innerHTML = 'Игра только для залогиненных — счёт уходит в общий рейтинг.';
-    }
+    if (!u) QUIZ.gate('Игра только для залогиненных — счёт уходит в общий рейтинг.');
   });
 
   function pickDay(pool) {

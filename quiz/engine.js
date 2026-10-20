@@ -34,6 +34,26 @@
       .catch(function () { if (done) done(null); });
   };
 
+  // Заглушка для незалогиненного: прячет навигацию и контент, оставляет вход.
+  Q.gate = function (msg) {
+    var tb = document.getElementById('topbar');
+    if (tb) {
+      for (var i = 0; i < tb.children.length; i++) {
+        var c = tb.children[i];
+        if (c.id !== 'auth') c.style.display = 'none';
+      }
+    }
+    var main = document.querySelector('main');
+    main.innerHTML =
+      '<div style="text-align:center;padding-top:60px">' +
+      '<h2 style="font-size:20px;border:none">Вброс по борту</h2>' +
+      '<p style="color:var(--fg-dim);font-size:14px">' + msg + '</p>' +
+      '<a href="' + Q.API + '/auth/yandex" style="display:inline-block;margin-top:16px;' +
+      'padding:12px 28px;font-size:15px;font-weight:600;color:#10131a;' +
+      'background:var(--accent);border-radius:10px;text-decoration:none">' +
+      'Войти через Яндекс</a></div>';
+  };
+
   Q.sets = function () { return window.QUIZ_SETS || []; };
 
   Q.dailyPool = function () {
