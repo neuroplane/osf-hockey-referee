@@ -32,9 +32,9 @@
     <p id="today"></p>
     <div class="rules-list">
       · 10 вопросов — у всех сегодня одинаковые<br>
-      · верный ответ: 100 очков<br>
-      · бонус за скорость: до +50 (тает за 30 сек)<br>
-      · идеальный день: +250<br>
+      · верный ответ: 2 очка<br>
+      · бонус за скорость: +1 (успей за 10 сек)<br>
+      · идеальный день: +5<br>
       · играй каждый день — растёт серия
     </div>
     <button id="start-btn">Играть</button>
@@ -103,7 +103,7 @@
     el('card').style.display = 'none';
     el('progress').style.width = '100%';
     el('res-big').textContent = res.score + ' очков';
-    el('res-sub').textContent = res.right + ' из 10 верных' + (res.perfect ? ' · идеальный день +250' : '');
+    el('res-sub').textContent = res.right + ' из 10 верных' + (res.perfect ? ' · идеальный день +5' : '');
     el('res-streak').textContent = 'Серия: ' + res.streak + (res.streak === 1 ? ' день' : res.streak < 5 ? ' дня' : ' дней');
     QUIZ.renderMistakes(el('mistakes'), res.mistakes);
     el('result').classList.add('show');
@@ -139,7 +139,7 @@
   function finish() {
     var perfect = right === 10;
     var st = streakAfter();
-    var scoreNow = total + (perfect ? 250 : 0);
+    var scoreNow = total + (perfect ? 5 : 0);
     var res = { score: scoreNow, right: right, perfect: perfect, streak: st.count, mistakes: mistakes };
     try {
       localStorage.setItem(LS_RES, JSON.stringify(res));
@@ -160,7 +160,7 @@
     el('score').innerHTML = 'Очки: <b>' + total + '</b>';
     el('progress').style.width = (idx / qs.length * 100) + '%';
     el('next-btn').classList.remove('show');
-    el('pts').innerHTML = 'Вопрос ' + (idx + 1) + '/10 · верный: <b>100</b> + бонус скорости <b id="bon">50</b>';
+    el('pts').innerHTML = 'Вопрос ' + (idx + 1) + '/10 · верный: <b>2</b> + бонус <b id="bon">1</b>';
     var bar = el('timerbar'), inner = bar.firstElementChild;
     inner.style.width = '100%'; bar.classList.remove('low');
     tStart = Date.now();
@@ -168,19 +168,18 @@
     tInt = setInterval(function () {
       var left = Math.max(0, 30000 - (Date.now() - tStart));
       inner.style.width = (left / 300) + '%';
-      var bon = Math.max(0, 50 - Math.floor((30000 - left) / 1000 / 3) * 5);
-      var b = el('bon'); if (b) b.textContent = bon;
+      var b = el('bon'); if (b) b.textContent = (30000 - left) <= 10000 ? '1' : '0';
       if (left <= 9000) bar.classList.add('low');
       if (left <= 0) { clearInterval(tInt); timeout(); }
     }, 100);
     cardRef = QUIZ.renderCard(el('card'), q, function (ok) {
       clearInterval(tInt);
       var secs = (Date.now() - tStart) / 1000;
-      var bonus = ok ? Math.max(0, 50 - Math.floor(secs / 3) * 5) : 0;
+      var bonus = ok && secs <= 10 ? 1 : 0;
       answers.push({ qn: q.n, ok: ok, secs: Math.round(secs * 10) / 10 });
-      if (ok) { total += 100 + bonus; right++; }
+      if (ok) { total += 2 + bonus; right++; }
       else mistakes.push(q);
-      el('score').innerHTML = 'Очки: <b>' + total + '</b>' + (bonus ? ' (+' + bonus + ')' : '');
+      el('score').innerHTML = 'Очки: <b>' + total + '</b>';
       el('next-btn').classList.add('show');
     });
   }
