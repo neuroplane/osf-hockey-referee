@@ -4,13 +4,31 @@ main { max-width: 720px; margin: 0 auto; padding: 76px 16px 60px; }
 
 #topbar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 14px;
   padding: 10px 16px; background: var(--bg-2); border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: none;
 }
-#topbar .back { color: var(--accent); text-decoration: none; font-size: 14px; white-space: nowrap; }
-#progress-wrap { flex: 1; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
+#topbar::-webkit-scrollbar { display: none; }
+#topbar .back { color: var(--accent); text-decoration: none; font-size: 14px; white-space: nowrap; flex: none; }
+#auth { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+#auth .uname {
+  font-size: 13px; color: var(--fg-dim); white-space: nowrap;
+  max-width: 34vw; overflow: hidden; text-overflow: ellipsis;
+}
+#auth .uname + .back::before { content: '· '; color: var(--fg-dim); }
+#progress-wrap { flex: 1 1 60px; min-width: 40px; height: 6px; background: var(--bg-3); border-radius: 3px; overflow: hidden; }
 #progress { height: 100%; width: 0; background: var(--accent); transition: width .25s; }
-#score { font-size: 14px; color: var(--fg-dim); white-space: nowrap; }
+#score { font-size: 14px; color: var(--fg-dim); white-space: nowrap; flex: none; }
+
+@media (max-width: 600px) {
+  #topbar { gap: 12px; padding: 8px 12px; }
+  #topbar .back { font-size: 13px; }
+  #score { font-size: 12.5px; }
+  main { padding: 64px 12px 48px; }
+  .qcard { padding: 14px; }
+  .qtext { font-size: 15px; }
+  .opt { font-size: 14px; padding: 11px 12px; }
+}
 #score b { color: var(--fg); }
 
 .setbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
