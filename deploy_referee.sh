@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 sh build_html.sh
 
 DEST=/var/www/sport.tgbsrv.ru/referee
-ssh -o BatchMode=yes tgbsrv "mkdir -p $DEST/img $DEST/tools $DEST/facts $DEST/addons $DEST/db $DEST/questions $DEST/files"
+ssh -o BatchMode=yes tgbsrv "mkdir -p $DEST/img $DEST/tools $DEST/facts $DEST/addons $DEST/db $DEST/questions $DEST/files $DEST/trainer"
 scp -o BatchMode=yes "ХОККЕЙ ОСФ 26-27.html" "tgbsrv:$DEST/index.html"
 scp -o BatchMode=yes facts/index.html "tgbsrv:$DEST/facts/index.html"
 scp -o BatchMode=yes tools/rules.css tools/rules.js "tgbsrv:$DEST/tools/"
@@ -20,6 +20,9 @@ scp -o BatchMode=yes \
 scp -o BatchMode=yes addons/index.html "tgbsrv:$DEST/addons/index.html"
 scp -o BatchMode=yes fhr_questions/index.html "tgbsrv:$DEST/db/index.html"
 scp -o BatchMode=yes fhr_questions/questions/index.html "tgbsrv:$DEST/questions/index.html"
+scp -o BatchMode=yes \
+  fhr_questions/trainer/index.html fhr_questions/trainer/data.js \
+  "tgbsrv:$DEST/trainer/"
 scp -o BatchMode=yes \
   fhr_questions/answers_1_1276.md fhr_questions/top40_rules.md \
   fhr_questions/exam_notes.md fhr_questions/questions.md \
