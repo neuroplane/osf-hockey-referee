@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вброс по борту — редактор вопросов</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+<style>
+#toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
+#q { flex: 1; padding: 10px 14px; font-size: 15px; color: var(--fg);
+     background: var(--bg-3); border: 1px solid var(--border); border-radius: 10px; }
+#onlyed { white-space: nowrap; font-size: 13.5px; color: var(--fg-dim); }
+#count { font-size: 12.5px; color: var(--fg-dim); margin: 0 0 8px; }
+.qrow { padding: 7px 10px; border-top: 1px solid var(--border); cursor: pointer;
+        font-size: 13.5px; display: flex; gap: 8px; align-items: baseline; }
+.qrow:hover { background: var(--bg-2); }
+.qrow .qn { color: var(--accent); flex: none; font-weight: 600; }
+.qrow .qt { color: var(--fg); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.qrow .ed { color: #8fe3ae; flex: none; font-size: 12px; }
+#editor { display: none; background: var(--bg-2); border: 1px solid var(--accent);
+          border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+#editor.open { display: block; }
+#editor .ehead { font-size: 13px; color: var(--fg-dim); margin-bottom: 8px; }
+#eq { width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 14px;
+      color: var(--fg); background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: 8px; resize: vertical; font-family: inherit; }
+.orow { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.orow input[type=radio] { flex: none; accent-color: var(--accent); }
+.orow .otxt { flex: 1; padding: 9px 11px; font-size: 13.5px; color: var(--fg);
+              background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px; }
+.orow .otxt.ok { border-color: #4caf7d; }
+#ebtns { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+#ebtns button { padding: 9px 16px; font-size: 14px; font-weight: 600; border-radius: 8px;
+                cursor: pointer; border: 1px solid var(--border); background: var(--bg-3); color: var(--fg); }
+#save { background: var(--accent); color: #10131a; border: none; }
+#revert { display: none; }
+#msg { font-size: 13px; color: #8fe3ae; align-self: center; }
+#denied { display: none; text-align: center; padding-top: 40px; color: var(--fg-dim); }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="daily.html">Игра дня</a>
+  <a class="back" href="board.html">Рейтинг</a>
+  <a class="back" href="vote.html">Голосование</a>
+  <a class="back" href="propose.html">+</a>
+  <span id="auth"></span>
+</div>
+<main>
+  <div id="denied"><h2>Редактор вопросов</h2><p>Нет прав — только для администратора.</p></div>
+  <div id="wrap" style="display:none">
+    <div id="toolbar">
+      <input id="q" placeholder="Поиск: № или текст вопроса" autocomplete="off">
+      <label id="onlyed"><input type="checkbox" id="edch"> только изменённые</label>
+    </div>
+    <div id="count"></div>
+    <div id="editor">
+      <div class="ehead" id="ehead"></div>
+      <textarea id="eq" rows="3"></textarea>
+      <div id="orows"></div>
+      <div id="ebtns">
+        <button id="save">Сохранить</button>
+        <button id="revert">Сбросить к исходному</button>
+        <button id="close">Закрыть</button>
+        <span id="msg"></span>
+      </div>
+    </div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var el = function (id) { return document.getElementById(id); };
+  var all = [], cur = null, user = null;
+
+  QUIZ.initAuth(el('auth'), function (u) {
+    user = u;
+    if (!u) { QUIZ.gate('Редактор только для администратора.'); return; }
+    if (!u.admin) { el('denied').style.display = ''; return; }
+    el('wrap').style.display = '';
+    QUIZ.load('', function () {
+      QUIZ.sets().forEach(function (s) {
+        s.questions.forEach(function (q) { all.push({ set: s.id, q: q }); });
+      });
+      renderList();
+    });
+  });
+
+  function qkey(it) { return it.set + ':' + it.q.n; }
+  function edited(it) { return !!QUIZ.overrides[qkey(it)]; }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function plain(s) { return String(s).replace(/<[^>]+>/g, ''); }
+
+  function renderList() {
+    var needle = el('q').value.trim().toLowerCase();
+    var onlyEd = el('edch').checked;
+    var h = '', shown = 0;
+    all.forEach(function (it) {
+      var text = plain(it.q.q).toLowerCase();
+      if (onlyEd && !edited(it)) return;
+      if (needle) {
+        var numMatch = String(it.q.n) === needle;
+        if (!numMatch && text.indexOf(needle) === -1) return;
+      }
+      shown++;
+      h += '<div class="qrow" data-k="' + qkey(it) + '">' +
+        '<span class="qn">№' + it.q.n + '</span>' +
+        '<span class="qt">' + esc(plain(it.q.q).slice(0, 140)) + '</span>' +
+        (edited(it) ? '<span class="ed">изм.</span>' : '') + '</div>';
+    });
+    el('list').innerHTML = h || '<p style="color:var(--fg-dim)">Ничего не найдено.</p>';
+    el('count').textContent = 'Показано: ' + shown + ' из ' + all.length;
+    var rows = el('list').querySelectorAll('.qrow');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].addEventListener('click', function () { openEditor(this.dataset.k); });
+    }
+  }
+
+  function find(key) {
+    for (var i = 0; i < all.length; i++) if (qkey(all[i]) === key) return all[i];
+    return null;
+  }
+
+  function openEditor(key) {
+    var it = find(key);
+    if (!it) return;
+    cur = it;
+    var q = it.q;
+    el('ehead').textContent = it.set + ' · вопрос №' + q.n + (q.rule ? ' · ' + q.rule : '');
+    it._plain = plain(q.q);
+    el('eq').value = it._plain;
+    var orows = el('orows');
+    orows.innerHTML = '';
+    q.opts.forEach(function (o, i) {
+      var row = document.createElement('div');
+      row.className = 'orow';
+      var r = document.createElement('input');
+      r.type = 'radio'; r.name = 'corr'; r.checked = (i === q.correct);
+      r.addEventListener('change', markOk);
+      var t = document.createElement('input');
+      t.className = 'otxt' + (i === q.correct ? ' ok' : ''); t.value = o;
+      row.appendChild(r); row.appendChild(t);
+      orows.appendChild(row);
+    });
+    el('revert').style.display = edited(it) ? '' : 'none';
+    el('msg').textContent = '';
+    el('editor').classList.add('open');
+    el('editor').scrollIntoView({ block: 'nearest' });
+  }
+
+  function markOk() {
+    var rows = el('orows').children;
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].querySelector('.otxt').className =
+        'otxt' + (rows[i].querySelector('input[type=radio]').checked ? ' ok' : '');
+    }
+  }
+
+  el('q').addEventListener('input', renderList);
+  el('edch').addEventListener('change', renderList);
+  el('close').addEventListener('click', function () {
+    el('editor').classList.remove('open'); cur = null;
+  });
+
+  el('save').addEventListener('click', function () {
+    if (!cur) return;
+    var rows = el('orows').children;
+    var opts = [], correct = 0;
+    for (var i = 0; i < rows.length; i++) {
+      opts.push(rows[i].querySelector('.otxt').value.trim());
+      if (rows[i].querySelector('input[type=radio]').checked) correct = i;
+    }
+    var qtext = el('eq').value.trim();
+    var qChanged = qtext !== cur._plain;
+    fetch(QUIZ.API + '/qedit', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ qkey: qkey(cur), q: qChanged ? qtext : null, opts: opts, correct: correct })
+    }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { el('msg').textContent = res.d.error || 'ошибка'; el('msg').style.color = '#f0a49e'; return; }
+        var q = cur.q;
+        if (!q._orig) q._orig = { q: q.q, opts: q.opts.slice(), correct: q.correct };
+        if (qChanged) q.q = qtext;
+        q.opts = opts; q.correct = correct;
+        QUIZ.overrides[qkey(cur)] = { q: qChanged ? qtext : null, opts: opts, correct: correct };
+        el('msg').style.color = '#8fe3ae';
+        el('msg').textContent = 'Сохранено ✔';
+        el('revert').style.display = '';
+        renderList();
+      }).catch(function () { el('msg').textContent = 'нет связи'; });
+  });
+
+  el('revert').addEventListener('click', function () {
+    if (!cur) return;
+    fetch(QUIZ.API + '/qedit/' + encodeURIComponent(qkey(cur)), {
+      method: 'DELETE', credentials: 'same-origin'
+    }).then(function () {
+      var q = cur.q;
+      if (q._orig) { q.q = q._orig.q; q.opts = q._orig.opts; q.correct = q._orig.correct; }
+      delete QUIZ.overrides[qkey(cur)];
+      el('msg').style.color = '#8fe3ae';
+      el('msg').textContent = 'Сброшено к исходному';
+      openEditor(qkey(cur));
+      renderList();
+    });
+  });
+})();
+</script>
+</body>
+</html>

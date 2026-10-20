@@ -32,6 +32,7 @@ BASE_URL = os.environ.get("BASE_URL", "/referee/api")
 THRESHOLD = int(os.environ.get("VOTE_THRESHOLD", "5"))
 SESSION_TTL = 60 * 60 * 24 * 30  # 30 дней
 CALLBACK_URL = f"{SITE_URL}{BASE_URL}/auth/callback"
+ADMIN_IDS = {int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
 
 # Шифрование персональных данных (имя, логин) в базе. Ключ — NAME_KEY в .env,
 # сгенерировать: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -106,6 +107,14 @@ def init_db():
             secs REAL NOT NULL,
             UNIQUE (user_id, day, qn)
         );
+        CREATE TABLE IF NOT EXISTS qedits (
+            qkey TEXT PRIMARY KEY,
+            q_text TEXT,
+            opts TEXT NOT NULL,
+            correct INTEGER NOT NULL,
+            editor INTEGER REFERENCES users(id),
+            updated BIGINT NOT NULL
+        );
         """)
         con.commit()
 
@@ -132,7 +141,8 @@ def me(req: Request):
     u = current_user(req)
     if not u:
         return {"logged": False, "auth_url": f"{BASE_URL}/auth/yandex"}
-    return {"logged": True, "name": u["name"], "login": u["login"]}
+    return {"logged": True, "name": u["name"], "login": u["login"],
+            "admin": u["id"] in ADMIN_IDS}
 
 
 @app.get("/auth/yandex")
@@ -388,6 +398,59 @@ def question_stats(day: int = 0):
             "ROUND(AVG(secs)::numeric, 1) AS avg_secs "
             "FROM daily_answers WHERE day=%s GROUP BY qn ORDER BY right_pct ASC", (day,)).fetchall()
     return {"day": day, "items": [dict(r) for r in rows]}
+
+
+# --- Редактор вопросов: переопределения лежат в БД и мержатся в data.js на лету ---
+
+@app.get("/qedits")
+def qedits_list():
+    with closing(db()) as con:
+        rows = con.execute("SELECT qkey, q_text, opts, correct FROM qedits").fetchall()
+    return {"items": {r["qkey"]: {"q": r["q_text"], "opts": json.loads(r["opts"]),
+                                  "correct": r["correct"]} for r in rows}}
+
+
+class QEdit(BaseModel):
+    qkey: str = Field(min_length=1, max_length=40)
+    q: str | None = Field(default=None, max_length=2000)
+    opts: list[str]
+    correct: int = Field(ge=0, le=3)
+
+
+@app.post("/qedit")
+def qedit_save(body: QEdit, req: Request):
+    u = current_user(req)
+    if not u or u["id"] not in ADMIN_IDS:
+        return JSONResponse({"error": "нет прав"}, status_code=403)
+    if not re.match(r"^[\w\-]+:\d+$", body.qkey):
+        return JSONResponse({"error": "кривой ключ вопроса"}, status_code=400)
+    opts = [o.strip() for o in body.opts]
+    if len(opts) != 4 or len(set(opts)) != 4 or any(not o or len(o) > 500 for o in opts):
+        return JSONResponse({"error": "нужно ровно 4 разных варианта"}, status_code=400)
+    q_text = body.q.strip() if body.q else None
+    if body.q is not None and len(q_text) < 10:
+        return JSONResponse({"error": "текст вопроса слишком короткий"}, status_code=400)
+    with closing(db()) as con:
+        con.execute(
+            "INSERT INTO qedits (qkey, q_text, opts, correct, editor, updated) "
+            "VALUES (%s,%s,%s,%s,%s,%s) "
+            "ON CONFLICT(qkey) DO UPDATE SET q_text=excluded.q_text, opts=excluded.opts, "
+            "correct=excluded.correct, editor=excluded.editor, updated=excluded.updated",
+            (body.qkey, q_text, json.dumps(opts, ensure_ascii=False), body.correct,
+             u["id"], int(time.time())))
+        con.commit()
+    return {"ok": True}
+
+
+@app.delete("/qedit/{qkey}")
+def qedit_delete(qkey: str, req: Request):
+    u = current_user(req)
+    if not u or u["id"] not in ADMIN_IDS:
+        return JSONResponse({"error": "нет прав"}, status_code=403)
+    with closing(db()) as con:
+        con.execute("DELETE FROM qedits WHERE qkey=%s", (qkey,))
+        con.commit()
+    return {"ok": True}
 
 
 @app.get("/health")
