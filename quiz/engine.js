@@ -134,11 +134,13 @@
       var d = document.createElement('details');
       var s = document.createElement('summary');
       s.textContent = '№' + q.n + ' — ' + q.q.replace(/<[^>]+>/g, '').slice(0, 90);
+      var qt = document.createElement('div');
+      qt.className = 'qfull'; qt.innerHTML = q.q + (q.table || '');
       var a = document.createElement('div');
       a.className = 'ans'; a.textContent = '✔ ' + q.opts[q.correct];
       var r = document.createElement('div');
       r.className = 'rule'; r.textContent = q.rule || '';
-      d.appendChild(s); d.appendChild(a); d.appendChild(r);
+      d.appendChild(s); d.appendChild(qt); d.appendChild(a); d.appendChild(r);
       box.appendChild(d);
     });
   };
