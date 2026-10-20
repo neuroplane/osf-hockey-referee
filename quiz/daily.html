@@ -85,7 +85,13 @@
 
   var qs, idx = 0, total = 0, right = 0, mistakes = [], cardRef, tStart, tInt;
   var user = null;
-  QUIZ.initAuth(document.getElementById('auth'), function (u) { user = u; });
+  QUIZ.initAuth(document.getElementById('auth'), function (u) {
+    user = u;
+    if (!u) {
+      el('start-btn').style.display = 'none';
+      el('played-note').innerHTML = 'Игра только для залогиненных — счёт уходит в общий рейтинг.';
+    }
+  });
 
   function pickDay(pool) {
     return QUIZ.seededShuffle(pool, dayId * 2654435761).slice(0, 10);
@@ -195,6 +201,7 @@
     }
     qs = pickDay(QUIZ.dailyPool());
     el('start-btn').addEventListener('click', function () {
+      if (!user) { location.href = QUIZ.API + '/auth/yandex'; return; }
       el('intro').style.display = 'none';
       el('card').style.display = '';
       render();
