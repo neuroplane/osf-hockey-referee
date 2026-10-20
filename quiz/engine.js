@@ -5,6 +5,35 @@
 (function () {
   var Q = window.QUIZ = {};
 
+  Q.API = '/referee/api';
+
+  // Блок авторизации в шапке: «Войти через Яндекс» или имя + выход.
+  // done(user|null) вызывается после загрузки.
+  Q.initAuth = function (holder, done) {
+    fetch(Q.API + '/me', { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (m) {
+        if (m.logged) {
+          holder.innerHTML = '';
+          var n = document.createElement('span');
+          n.className = 'back'; n.style.color = 'var(--fg)'; n.textContent = m.name;
+          var out = document.createElement('a');
+          out.className = 'back'; out.href = '#'; out.textContent = 'выйти';
+          out.addEventListener('click', function (e) {
+            e.preventDefault();
+            fetch(Q.API + '/logout', { method: 'POST', credentials: 'same-origin' })
+              .then(function () { location.reload(); });
+          });
+          holder.appendChild(n); holder.appendChild(out);
+          if (done) done(m);
+        } else {
+          holder.innerHTML = '<a class="back" href="' + m.auth_url + '">Войти через Яндекс</a>';
+          if (done) done(null);
+        }
+      })
+      .catch(function () { if (done) done(null); });
+  };
+
   Q.sets = function () { return window.QUIZ_SETS || []; };
 
   Q.dailyPool = function () {

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Голосование — Вброс по борту</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+<style>
+.prop { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 14px; }
+.prop .ptext { font-size: 15px; line-height: 1.5; margin: 0 0 10px; }
+.prop .popt { font-size: 13.5px; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: var(--fg-dim); }
+.prop .popt.ok { color: #8fe3ae; }
+.prop .meta { font-size: 12.5px; color: var(--fg-dim); margin-top: 10px; }
+.prop .votes { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.prop .votes button {
+  font: inherit; font-size: 15px; width: 40px; padding: 7px 0; cursor: pointer;
+  color: var(--fg); background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px;
+}
+.prop .votes button.on-up { border-color: #4caf7d; color: #8fe3ae; }
+.prop .votes button.on-down { border-color: #b0433a; color: #f0a49e; }
+.prop .votes button:disabled { opacity: .4; cursor: default; }
+.prop .vscore { font-size: 15px; font-weight: 600; min-width: 30px; text-align: center; }
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.tabs .chip { font: inherit; font-size: 13px; padding: 6px 14px; cursor: pointer; color: var(--fg-dim); background: var(--bg-3); border: 1px solid var(--border); border-radius: 999px; }
+.tabs .chip.on { color: #10131a; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+.empty { color: var(--fg-dim); text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="./">← Тренажёр</a>
+  <a class="back" href="daily.html">Игра дня</a>
+  <a class="back" href="propose.html">Предложить вопрос</a>
+  <div id="progress-wrap"><div id="progress" style="width:100%"></div></div>
+  <span id="auth"></span>
+</div>
+<main>
+  <h2 style="font-size:20px">Голосование за вопросы</h2>
+  <p style="font-size:13.5px;color:var(--fg-dim)">+5 — вопрос попадает в базу · −5 — в архив · за свой вопрос голосовать нельзя</p>
+  <div class="tabs">
+    <button class="chip on" data-s="pending">На голосовании</button>
+    <button class="chip" data-s="approved">Принятые</button>
+    <button class="chip" data-s="rejected">Архив</button>
+  </div>
+  <div id="list"></div>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var list = document.getElementById('list');
+  var cur = 'pending', logged = false;
+
+  function load() {
+    fetch(QUIZ.API + '/proposals?status=' + cur, { credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        list.innerHTML = '';
+        if (!d.items.length) {
+          list.innerHTML = '<div class="empty">Пока пусто</div>';
+          return;
+        }
+        d.items.forEach(render);
+      });
+  }
+
+  function render(p) {
+    var box = document.createElement('div');
+    box.className = 'prop';
+    var h = '<p class="ptext">' + esc(p.text) + '</p>';
+    p.opts.forEach(function (o, i) {
+      h += '<div class="popt' + (i === p.correct ? ' ok' : '') + '">' +
+        (i === p.correct ? '✔ ' : '· ') + esc(o) + '</div>';
+    });
+    h += '<div class="meta">' + esc(p.rule) + ' · предложил: ' + esc(p.author) + '</div>';
+    h += '<div class="votes">' +
+      '<button class="up' + (p.my_vote === 1 ? ' on-up' : '') + '"' + (p.mine ? ' disabled' : '') + '>👍</button>' +
+      '<span class="vscore">' + (p.score > 0 ? '+' : '') + p.score + '</span>' +
+      '<button class="down' + (p.my_vote === -1 ? ' on-down' : '') + '"' + (p.mine ? ' disabled' : '') + '>👎</button>' +
+      (p.mine ? '<span class="meta">твой вопрос</span>' : '') + '</div>';
+    box.innerHTML = h;
+    var up = box.querySelector('.up'), down = box.querySelector('.down'), sc = box.querySelector('.vscore');
+    function cast(v) {
+      if (!logged) { location.href = QUIZ.API + '/auth/yandex'; return; }
+      var nv = (p.my_vote === v) ? 0 : v;
+      fetch(QUIZ.API + '/vote', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ proposal_id: p.id, value: nv })
+      }).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.ok) { p.my_vote = nv; p.score = j.score; refresh(); }
+      });
+    }
+    function refresh() {
+      sc.textContent = (p.score > 0 ? '+' : '') + p.score;
+      up.className = 'up' + (p.my_vote === 1 ? ' on-up' : '');
+      down.className = 'down' + (p.my_vote === -1 ? ' on-down' : '');
+    }
+    up.addEventListener('click', function () { cast(1); });
+    down.addEventListener('click', function () { cast(-1); });
+    list.appendChild(box);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  document.querySelectorAll('.tabs .chip').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.tabs .chip').forEach(function (c) { c.classList.remove('on'); });
+      b.classList.add('on'); cur = b.dataset.s; load();
+    });
+  });
+
+  QUIZ.initAuth(document.getElementById('auth'), function (u) { logged = !!u; load(); });
+})();
+</script>
+</body>
+</html>

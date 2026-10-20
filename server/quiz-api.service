@@ -1,0 +1,14 @@
+[Unit]
+Description=Quiz API — Вброс по борту (referee quiz backend)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/quiz-api
+EnvironmentFile=/opt/quiz-api/.env
+ExecStart=/opt/quiz-api/venv/bin/uvicorn quiz_api:app --host 127.0.0.1 --port 8020
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

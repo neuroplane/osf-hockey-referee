@@ -22,9 +22,15 @@ scp -o BatchMode=yes fhr_questions/index.html "tgbsrv:$DEST/db/index.html"
 scp -o BatchMode=yes fhr_questions/questions/index.html "tgbsrv:$DEST/questions/index.html"
 scp -o BatchMode=yes fhr_questions/trainer/index.html "tgbsrv:$DEST/trainer/"
 scp -o BatchMode=yes \
-  quiz/index.html quiz/daily.html quiz/engine.css quiz/engine.js \
+  quiz/index.html quiz/daily.html quiz/propose.html quiz/vote.html \
+  quiz/engine.css quiz/engine.js \
   "tgbsrv:$DEST/quiz/"
 scp -o BatchMode=yes quiz/data/*.js "tgbsrv:$DEST/quiz/data/"
+
+# Бэкенд игры «Вброс по борту» (секреты в /opt/quiz-api/.env — не заливаются)
+scp -o BatchMode=yes server/quiz_api.py server/requirements.txt "tgbsrv:/opt/quiz-api/"
+ssh -o BatchMode=yes tgbsrv \
+  "/opt/quiz-api/venv/bin/pip -q install -r /opt/quiz-api/requirements.txt && systemctl restart quiz-api"
 scp -o BatchMode=yes \
   fhr_questions/answers_1_1276.md fhr_questions/top40_rules.md \
   fhr_questions/exam_notes.md fhr_questions/questions.md \

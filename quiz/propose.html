@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Предложить вопрос — Вброс по борту</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+<style>
+form label { display: block; font-size: 13px; color: var(--fg-dim); margin: 14px 0 4px; }
+form input[type=text], form textarea {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 14.5px;
+  color: var(--fg); background: var(--bg-3); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+form textarea { min-height: 90px; resize: vertical; }
+.optrow { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.optrow input[type=radio] { flex: none; width: 18px; height: 18px; accent-color: var(--accent); }
+.optrow input[type=text] { flex: 1; }
+#msg { margin-top: 14px; font-size: 14px; }
+#msg.ok { color: #8fe3ae; }
+#msg.err { color: #f0a49e; }
+button.submit { margin-top: 20px; padding: 13px 30px; font-size: 15px; font-weight: 600; color: #10131a; background: var(--accent); border: none; border-radius: 10px; cursor: pointer; }
+.hint { font-size: 13px; color: var(--fg-dim); margin-top: 6px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="./">← Тренажёр</a>
+  <a class="back" href="daily.html">Игра дня</a>
+  <a class="back" href="vote.html">Голосование</a>
+  <div id="progress-wrap"><div id="progress" style="width:100%"></div></div>
+  <span id="auth"></span>
+</div>
+<main>
+  <h2 style="font-size:20px">Предложить вопрос</h2>
+  <p class="hint">Вопрос уйдёт на голосование сообществу. Наберёт +5 — попадёт в базу, −5 — в архив.
+  Обязательно укажи пункт правил, на который опирается правильный ответ.</p>
+  <div id="need-login" style="display:none">
+    <p>Чтобы предложить вопрос, нужно войти через Яндекс.</p>
+  </div>
+  <form id="form" style="display:none">
+    <label for="q">Текст вопроса</label>
+    <textarea id="q" required maxlength="2000" placeholder="Например: При каком счёте..."></textarea>
+    <label>Варианты ответа (отметь правильный)</label>
+    <div class="optrow"><input type="radio" name="correct" value="0" required><input type="text" id="o0" required maxlength="500" placeholder="Вариант 1"></div>
+    <div class="optrow"><input type="radio" name="correct" value="1"><input type="text" id="o1" required maxlength="500" placeholder="Вариант 2"></div>
+    <div class="optrow"><input type="radio" name="correct" value="2"><input type="text" id="o2" required maxlength="500" placeholder="Вариант 3"></div>
+    <div class="optrow"><input type="radio" name="correct" value="3"><input type="text" id="o3" required maxlength="500" placeholder="Вариант 4"></div>
+    <label for="rule">Ссылка на правило</label>
+    <input type="text" id="rule" required maxlength="200" placeholder="Например: §16.2 или Правило 24.2 абзац 3">
+    <button class="submit" type="submit">Отправить на голосование</button>
+    <div id="msg"></div>
+  </form>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var form = document.getElementById('form');
+  var msg = document.getElementById('msg');
+  QUIZ.initAuth(document.getElementById('auth'), function (u) {
+    form.style.display = u ? '' : 'none';
+    document.getElementById('need-login').style.display = u ? 'none' : '';
+  });
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var opts = [0, 1, 2, 3].map(function (i) { return document.getElementById('o' + i).value.trim(); });
+    var correct = parseInt(document.querySelector('input[name=correct]:checked').value, 10);
+    msg.className = ''; msg.textContent = '';
+    fetch(QUIZ.API + '/propose', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: document.getElementById('q').value.trim(),
+        opts: opts, correct: correct,
+        rule: document.getElementById('rule').value.trim()
+      })
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (res.ok) {
+          msg.className = 'ok';
+          msg.textContent = 'Вопрос отправлен на голосование. Спасибо!';
+          form.reset();
+        } else {
+          msg.className = 'err';
+          msg.textContent = res.j.error || 'Ошибка отправки';
+        }
+      }).catch(function () { msg.className = 'err'; msg.textContent = 'Сеть недоступна'; });
+  });
+})();
+</script>
+</body>
+</html>

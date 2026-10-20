@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="revision" content="191026">
-<title>Тренажёр — вопросы для судей</title>
+<title>Тренажёр — Вброс по борту</title>
 <link rel="stylesheet" href="../tools/rules.css">
 <link rel="stylesheet" href="engine.css">
 </head>
@@ -12,9 +12,12 @@
 <div id="topbar">
   <a class="back" href="../">← Правила</a>
   <a class="back" href="daily.html">Игра дня</a>
-  <a class="back" href="../db/">База вопросов</a>
+  <a class="back" href="vote.html">Голосование</a>
+  <a class="back" href="propose.html">+ Вопрос</a>
+  <a class="back" href="../db/">База</a>
   <div id="progress-wrap"><div id="progress"></div></div>
   <span id="score"></span>
+  <span id="auth"></span>
 </div>
 <main>
   <div class="setbar" id="setbar"></div>
@@ -44,6 +47,7 @@
 (function () {
   var card = document.getElementById('card');
   var next = document.getElementById('next-btn');
+  QUIZ.initAuth(document.getElementById('auth'));
   var order = [], idx = 0, score = 0, mistakes = [], currentSet = null;
 
   function el(id) { return document.getElementById(id); }
