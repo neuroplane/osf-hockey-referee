@@ -137,12 +137,12 @@
         }
         var h = '<table class="pt" style="margin:0 auto;border-collapse:collapse">';
         d.items.forEach(function (r, i) {
-          h += '<tr><td style="padding:5px 12px;border:1px solid var(--border)">' + (i + 1) +
-            '</td><td style="padding:5px 12px;border:1px solid var(--border)">' + esc(r.name) +
-            '</td><td style="padding:5px 12px;border:1px solid var(--border)"><b>' + r.score +
-            '</b></td><td style="padding:5px 12px;border:1px solid var(--border)">' + r.right + '/10</td></tr>';
+          h += '<tr><td style="padding:3px 12px;border:1px solid var(--border)">' + (i + 1) +
+            '</td><td style="padding:3px 12px;border:1px solid var(--border)">' + esc(r.name) +
+            '</td><td style="padding:3px 12px;border:1px solid var(--border)"><b>' + r.score +
+            '</b></td><td style="padding:3px 12px;border:1px solid var(--border)">' + r.right + '/10</td></tr>';
         });
-        el('board').innerHTML = '<p class="sub">Рейтинг дня (' + d.players + ')</p>' + h + '</table>';
+        el('board').innerHTML = '<p class="sub" style="margin:4px 0">Рейтинг дня (' + d.players + ')</p>' + h + '</table>';
       }).catch(function () {});
   }
 

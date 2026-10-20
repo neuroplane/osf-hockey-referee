@@ -76,19 +76,22 @@ main { max-width: 720px; margin: 0 auto; padding: 76px 16px 60px; }
 .timerbar > div { height: 100%; background: var(--accent); transition: width .5s linear; }
 .timerbar.low > div { background: #b0433a; }
 
-.result { display: none; text-align: center; padding-top: 40px; }
+.result { display: none; text-align: center; padding-top: 18px; }
 .result.show { display: block; }
-.result h2 { font-size: 22px; }
-.result .big { font-size: 42px; font-weight: 700; color: var(--accent); margin: 8px 0 4px; }
+.result h2 { font-size: 17px; }
+.result .big { font-size: 30px; font-weight: 700; color: var(--accent); margin: 4px 0 2px; }
 .result .sub { color: var(--fg-dim); }
-.result .streak { margin-top: 10px; font-size: 15px; }
-#mistakes { text-align: left; margin: 24px 0; }
-#mistakes details { border-top: 1px solid var(--border); padding: 8px 0; }
-#mistakes summary { cursor: pointer; color: var(--fg); font-size: 14px; }
-#mistakes .ans { color: #8fe3ae; font-size: 13px; padding: 6px 0 2px; }
+.result .streak { margin-top: 3px; font-size: 13.5px; color: var(--fg-dim); }
+#mistakes { text-align: left; margin: 14px 0; }
+#mistakes details { border-top: 1px solid var(--border); padding: 5px 0; }
+#mistakes summary {
+  cursor: pointer; color: var(--fg); font-size: 13.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#mistakes .ans { color: #8fe3ae; font-size: 13px; padding: 5px 0 2px; }
 #mistakes .rule { color: var(--fg-dim); font-size: 12.5px; }
 .result button {
-  margin: 8px 6px 0; padding: 11px 22px; font-size: 15px; font-weight: 600;
+  margin: 6px 6px 0; padding: 9px 18px; font-size: 14.5px; font-weight: 600;
   border: 1px solid var(--border); border-radius: 10px; cursor: pointer;
   background: var(--bg-3); color: var(--fg);
 }
