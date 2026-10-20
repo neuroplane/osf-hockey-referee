@@ -59,13 +59,13 @@
         var list = document.getElementById('list');
         if (!d.items.length) { list.innerHTML = '<div class="empty">Пока никто не играл</div>'; return; }
         var h = '<table class="board"><tr><th>#</th><th>Судья</th><th class="num">Игр</th>' +
-          '<th class="num">Очки</th><th class="num">Верно</th><th class="num">Ср.</th><th class="num">Лучший</th></tr>';
+          '<th class="num">Очки</th><th class="num">Верно</th><th class="num">Лучший</th></tr>';
         d.items.forEach(function (r, i) {
           var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
           h += '<tr' + (me && r.name === me.name ? ' class="me"' : '') + '>' +
             '<td class="medal">' + medal + '</td><td>' + esc(r.name) + '</td>' +
             '<td class="num">' + r.days + '</td><td class="num"><b>' + r.total + '</b></td>' +
-            '<td class="num">' + r.rights + '</td><td class="num">' + r.avg_score + '</td>' +
+            '<td class="num">' + r.rights + '</td>' +
             '<td class="num">' + r.best + '</td></tr>';
         });
         list.innerHTML = h + '</table>';
