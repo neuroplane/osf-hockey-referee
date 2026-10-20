@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рейтинг — Вброс по борту</title>
+<link rel="stylesheet" href="../tools/rules.css">
+<link rel="stylesheet" href="engine.css">
+<style>
+.board { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.board th, .board td { border: 1px solid var(--border); padding: 8px 10px; font-size: 14px; text-align: left; }
+.board th { background: var(--bg-3); color: var(--fg-dim); font-weight: 600; }
+.board td.num, .board th.num { text-align: right; }
+.board tr.me td { color: var(--accent); }
+.board .medal { font-weight: 700; }
+.period { color: var(--fg-dim); font-size: 13px; margin: 4px 0 14px; }
+.empty { color: var(--fg-dim); text-align: center; padding: 40px 0; }
+@media (max-width: 600px) {
+  .board th, .board td { padding: 6px 7px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div id="topbar">
+  <a class="back" href="daily.html">Игра дня</a>
+  <a class="back" href="trainer.html">Тренажёр</a>
+  <a class="back" href="vote.html">Голосование</a>
+  <a class="back" href="propose.html">+ Вопрос</a>
+  <div id="progress-wrap"><div id="progress" style="width:100%"></div></div>
+  <span id="auth"></span>
+</div>
+<main>
+  <h2 style="font-size:20px">Рейтинг за 30 дней</h2>
+  <p class="period" id="period"></p>
+  <div id="list"><div class="empty">Загрузка…</div></div>
+</main>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var me = null;
+  QUIZ.initAuth(document.getElementById('auth'), function (u) {
+    me = u;
+    if (!u) { QUIZ.gate('Рейтинг виден только залогиненным судьям.'); return; }
+    load();
+  });
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function load() {
+    fetch(QUIZ.API + '/daily/monthly?days=30')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var f = new Date(d.since.toString().replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'));
+        document.getElementById('period').textContent =
+          'с ' + f.toLocaleDateString('ru-RU') + ' · игроков: ' + d.players + ' · игровых дней: ' + d.days_with_games;
+        var list = document.getElementById('list');
+        if (!d.items.length) { list.innerHTML = '<div class="empty">Пока никто не играл</div>'; return; }
+        var h = '<table class="board"><tr><th>#</th><th>Судья</th><th class="num">Игр</th>' +
+          '<th class="num">Очки</th><th class="num">Верно</th><th class="num">Ср.</th><th class="num">Лучший</th></tr>';
+        d.items.forEach(function (r, i) {
+          var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+          h += '<tr' + (me && r.name === me.name ? ' class="me"' : '') + '>' +
+            '<td class="medal">' + medal + '</td><td>' + esc(r.name) + '</td>' +
+            '<td class="num">' + r.days + '</td><td class="num"><b>' + r.total + '</b></td>' +
+            '<td class="num">' + r.rights + '</td><td class="num">' + r.avg_score + '</td>' +
+            '<td class="num">' + r.best + '</td></tr>';
+        });
+        list.innerHTML = h + '</table>';
+      });
+  }
+})();
+</script>
+</body>
+</html>

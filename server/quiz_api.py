@@ -14,7 +14,7 @@ import re
 import secrets
 import time
 from contextlib import closing
-from datetime import date
+from datetime import date, timedelta
 
 import httpx
 import psycopg
@@ -309,6 +309,26 @@ def leaderboard(day: int = 0):
         total = con.execute("SELECT COUNT(*) c FROM daily_scores WHERE day=%s", (day,)).fetchone()["c"]
     return {"day": day, "players": total,
             "items": [{"name": r["name"], "score": r["score"], "right": r["right_cnt"]} for r in rows]}
+
+
+@app.get("/daily/monthly")
+def monthly_leaderboard(days: int = 30):
+    days = min(max(days, 1), 365)
+    since = date.today() - timedelta(days=days - 1)
+    since_id = since.year * 10000 + since.month * 100 + since.day
+    with closing(db()) as con:
+        rows = con.execute(
+            "SELECT u.name, COUNT(*) AS days, SUM(d.score) AS total, "
+            "SUM(d.right_cnt) AS rights, ROUND(AVG(d.score)) AS avg_score, MAX(d.score) AS best "
+            "FROM daily_scores d JOIN users u ON u.id=d.user_id "
+            "WHERE d.day >= %s "
+            "GROUP BY u.id, u.name ORDER BY total DESC, days DESC, rights DESC LIMIT 100",
+            (since_id,)).fetchall()
+        players_days = con.execute(
+            "SELECT COUNT(DISTINCT user_id) p, COUNT(DISTINCT day) d FROM daily_scores WHERE day >= %s",
+            (since_id,)).fetchone()
+    return {"days": days, "since": since_id, "players": players_days["p"], "days_with_games": players_days["d"],
+            "items": [dict(r) for r in rows]}
 
 
 @app.get("/stats/questions")
