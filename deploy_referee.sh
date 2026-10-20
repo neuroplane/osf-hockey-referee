@@ -21,7 +21,7 @@ scp -o BatchMode=yes addons/index.html "tgbsrv:$DEST/addons/index.html"
 scp -o BatchMode=yes fhr_questions/index.html "tgbsrv:$DEST/db/index.html"
 scp -o BatchMode=yes fhr_questions/questions/index.html "tgbsrv:$DEST/questions/index.html"
 scp -o BatchMode=yes \
-  fhr_questions/answers_1_800.md fhr_questions/top40_rules.md \
+  fhr_questions/answers_1_900.md fhr_questions/top40_rules.md \
   fhr_questions/exam_notes.md fhr_questions/questions.md \
   fhr_questions/questions_deleted.md fhr_questions/questions.json \
   fhr_questions/rules/rules.json fhr_questions/rules/rules_ekp_2022_23.json \
