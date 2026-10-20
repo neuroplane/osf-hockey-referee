@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 import httpx
 import psycopg
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from psycopg.rows import dict_row
@@ -31,6 +32,24 @@ BASE_URL = os.environ.get("BASE_URL", "/referee/api")
 THRESHOLD = int(os.environ.get("VOTE_THRESHOLD", "5"))
 SESSION_TTL = 60 * 60 * 24 * 30  # 30 дней
 CALLBACK_URL = f"{SITE_URL}{BASE_URL}/auth/callback"
+
+# Шифрование персональных данных (имя, логин) в базе. Ключ — NAME_KEY в .env,
+# сгенерировать: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+_fernet = Fernet(os.environ["NAME_KEY"].encode()) if os.environ.get("NAME_KEY") else None
+
+
+def enc(s):
+    return _fernet.encrypt(s.encode()).decode() if (_fernet and s) else (s or "")
+
+
+def dec(s):
+    if not _fernet or not s:
+        return s or ""
+    try:
+        return _fernet.decrypt(s.encode()).decode()
+    except InvalidToken:
+        return s  # легаси-строка в открытом виде
+
 
 app = FastAPI(docs_url=None, redoc_url=None)
 
@@ -102,6 +121,9 @@ def current_user(req: Request):
         row = con.execute(
             "SELECT u.id, u.name, u.login FROM sessions s JOIN users u ON u.id=s.user_id "
             "WHERE s.token=%s AND s.expires>%s", (token, int(time.time()))).fetchone()
+        if row:
+            row["name"] = dec(row["name"])
+            row["login"] = dec(row["login"])
         return row
 
 
@@ -144,7 +166,7 @@ async def auth_callback(code: str, resp: Response):
         con.execute(
             "INSERT INTO users (yandex_id, login, name, created) VALUES (%s,%s,%s,%s) "
             "ON CONFLICT(yandex_id) DO UPDATE SET login=excluded.login, name=excluded.name",
-            (yid, login, name, now))
+            (yid, enc(login), enc(name), now))
         uid = con.execute("SELECT id FROM users WHERE yandex_id=%s", (yid,)).fetchone()["id"]
         token = secrets.token_urlsafe(32)
         con.execute("INSERT INTO sessions (token, user_id, expires) VALUES (%s,%s,%s)",
@@ -215,7 +237,7 @@ def proposals(req: Request, status: str = "pending"):
     return {"items": [{
         "id": r["id"], "text": r["text"], "opts": json.loads(r["opts"]),
         "correct": r["correct"], "rule": r["rule"], "score": r["score"],
-        "author": r["author"], "my_vote": r["my"], "mine": bool(u and u["id"] == r["user_id"])
+        "author": dec(r["author"]), "my_vote": r["my"], "mine": bool(u and u["id"] == r["user_id"])
     } for r in rows]}
 
 
@@ -308,7 +330,7 @@ def leaderboard(day: int = 0):
             "ORDER BY d.score DESC, d.ts ASC LIMIT 20", (day,)).fetchall()
         total = con.execute("SELECT COUNT(*) c FROM daily_scores WHERE day=%s", (day,)).fetchone()["c"]
     return {"day": day, "players": total,
-            "items": [{"name": r["name"], "score": r["score"], "right": r["right_cnt"]} for r in rows]}
+            "items": [{"name": dec(r["name"]), "score": r["score"], "right": r["right_cnt"]} for r in rows]}
 
 
 @app.get("/daily/monthly")
@@ -328,7 +350,7 @@ def monthly_leaderboard(days: int = 30):
             "SELECT COUNT(DISTINCT user_id) p, COUNT(DISTINCT day) d FROM daily_scores WHERE day >= %s",
             (since_id,)).fetchone()
     return {"days": days, "since": since_id, "players": players_days["p"], "days_with_games": players_days["d"],
-            "items": [dict(r) for r in rows]}
+            "items": [{**dict(r), "name": dec(r["name"])} for r in rows]}
 
 
 @app.get("/stats/questions")
