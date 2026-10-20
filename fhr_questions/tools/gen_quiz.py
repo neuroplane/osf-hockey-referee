@@ -64,8 +64,61 @@ YESNO = [
     'Запрещено — наказывается Малым штрафом',
 ]
 
+PENALTIES = [
+    'Без штрафа — устное предупреждение',
+    'Малый скамеечный штраф',
+    'Малый штраф',
+    'Малый двойной штраф (2+2)',
+    'Большой штраф (5 минут)',
+    'Большой штраф + Дисциплинарный до конца матча',
+    'Дисциплинарный штраф (10 минут)',
+    'Дисциплинарный до конца матча штраф',
+    'Матч-штраф',
+    'Штрафной бросок',
+]
+
+GOALS = [
+    'Взятие ворот засчитывается',
+    'Взятие ворот не засчитывается',
+    'Взятие ворот засчитывается + штраф виновному',
+    'Взятие ворот не засчитывается + штраф виновному',
+    'Назначается штрафной бросок',
+]
+
 def is_yesno(a):
     return len(a) < 60 and re.match(r'^(Да|Нет)\b', a)
+
+def norm(a):
+    return re.sub(r'[^а-яa-z0-9 ]', '', a.lower()).replace('  ', ' ').strip()
+
+def dup(a, b):
+    na, nb = norm(a), norm(b)
+    return na == nb or (len(na) > 8 and len(nb) > 8 and (na in nb or nb in na))
+
+def category(a):
+    if re.search(r'штраф|бросок|предупрежден', a, re.I) and len(a) < 110:
+        return 'penalty'
+    if re.search(r'взятие ворот|гол', a, re.I) and len(a) < 90:
+        return 'goal'
+    return 'other'
+
+def pick_distractors(ans, same_rule, all_pool):
+    cat = category(ans)
+    canon = {'penalty': PENALTIES, 'goal': GOALS}.get(cat, [])
+    out = []
+
+    def take(src):
+        for a in src:
+            if len(out) >= 3:
+                break
+            if not dup(a, ans) and all(not dup(a, o) for o in out):
+                out.append(a)
+
+    take([a for a in same_rule if category(a) == cat])
+    take(canon)
+    take([a for a in same_rule])
+    take([a for a in all_pool if len(a) < 140])
+    return out[:3]
 
 qs = []
 for num in range(FR, TO + 1):
@@ -81,11 +134,9 @@ for num in range(FR, TO + 1):
         key = re.search(r'(\d+)', rule)
         same = [a for a in pool_by_rule.get(key.group(1) if key else '', set()) if a != ans]
         random.shuffle(same)
-        distract = same[:3]
-        if len(distract) < 3:
-            extra = [a for a in pool_all if a != ans and a not in distract and len(a) < 140]
-            random.shuffle(extra)
-            distract += extra[:3 - len(distract)]
+        pool = pool_all[:]
+        random.shuffle(pool)
+        distract = pick_distractors(ans, same, pool)
     opts = distract[:3] + [ans]
     random.shuffle(opts)
     qs.append(dict(
