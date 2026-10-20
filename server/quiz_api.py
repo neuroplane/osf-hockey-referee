@@ -318,6 +318,20 @@ def daily_score(body: DailyScore, req: Request):
     return {"ok": True}
 
 
+@app.get("/daily/me")
+def daily_me(req: Request):
+    u = current_user(req)
+    if not u:
+        return JSONResponse({"error": "нужно войти"}, status_code=401)
+    t = date.today()
+    day = t.year * 10000 + t.month * 100 + t.day
+    with closing(db()) as con:
+        r = con.execute(
+            "SELECT score, right_cnt FROM daily_scores WHERE user_id=%s AND day=%s",
+            (u["id"], day)).fetchone()
+    return {"day": day, "score": r["score"], "right": r["right_cnt"]} if r else {"day": day, "played": False}
+
+
 @app.get("/daily/leaderboard")
 def leaderboard(day: int = 0):
     if not day:

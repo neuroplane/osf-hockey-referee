@@ -193,6 +193,16 @@
       el('start-btn').style.display = 'none';
       el('played-note').textContent = 'Сегодня уже сыграно. Возвращайся завтра!';
       showFinal(saved);
+      // сверка с сервером: счёт мог быть пересчитан
+      fetch(QUIZ.API + '/daily/me', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (m) {
+          if (m.score != null && m.score !== saved.score) {
+            saved.score = m.score;
+            el('res-big').textContent = m.score + ' очков';
+            try { localStorage.setItem(LS_RES, JSON.stringify(saved)); } catch (e) {}
+          }
+        }).catch(function () {});
       return;
     }
     qs = pickDay(QUIZ.dailyPool());
