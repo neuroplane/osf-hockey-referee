@@ -7,7 +7,7 @@
 # Использование:
 #   python3 gen_quiz.py <src.md> <from> <to> <id> <title> <out.js>
 # Пример:
-#   python3 gen_quiz.py ../answers_1_1276.md 1 1276 fhr-active "ФХР — активные вопросы" ../quiz/data/fhr_active.js
+#   python3 gen_quiz.py ../answers.md 1 1276 fhr-active "ФХР — активные вопросы" ../quiz/data/fhr_active.js
 import json, re, random, pathlib, sys
 
 SRC, FR, TO, QID, TITLE, OUT = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]

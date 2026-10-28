@@ -1437,7 +1437,7 @@ for i, q in enumerate(ACT[:N], 1):
     md.append(f"**Ответ:** {ans}  ")
     md.append(f"_{rule}_\n")
 
-(ROOT / f'answers_1_{N}.md').write_text('\n'.join(md), encoding='utf-8')
+(ROOT / 'answers.md').write_text('\n'.join(md), encoding='utf-8')
 
 toc = ''.join(f'<li><a href="#q{i}">Вопрос {i}</a></li>' for i in ANSWERS)
 page = f"""<!DOCTYPE html>

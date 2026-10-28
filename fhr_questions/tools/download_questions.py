@@ -19,9 +19,9 @@ from html import unescape
 from pathlib import Path
 
 API = "https://referees.fhr.ru/graphql"
-BASE = Path(__file__).parent
+BASE = Path(__file__).resolve().parents[2]
 OUT_DIR = BASE / "fhr_questions"
-RULES_DIR = BASE / "rules_docs"
+RULES_DIR = BASE / "fhr_questions" / "rules"
 
 DOC_LABELS = {
     "ekp_2022_23": "Руководство ЕКП 2022/23",

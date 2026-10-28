@@ -12,7 +12,7 @@ from download_questions import (
     clean_html, load_rules, media_url, numrule_refs, resolve_ref,
 )
 
-BASE = Path(__file__).parent
+BASE = Path(__file__).resolve().parents[2]
 OUT = BASE / "fhr_questions" / "index.html"
 
 HTML = """<!DOCTYPE html>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Генератор данных тренажёра: из answers_1_1276.md берёт вопросы N..M,
+# Генератор данных тренажёра: из answers.md берёт вопросы N..M,
 # к каждому собирает 4 варианта ответа (правильный + 3 дистрактора
 # из ответов на вопросы того же правила, иначе — из общего пула).
 # Использование: python3 gen_trainer.py [from] [to]
@@ -11,9 +11,7 @@ FR, TO = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (1, 100)
 OUT = ROOT / 'trainer' / (sys.argv[3] if len(sys.argv) > 3 else 'data.js')
 random.seed(42)
 
-answers_md = max(ROOT.glob('answers_1_*.md'),
-                 key=lambda p: int(re.search(r'_(\d+)\.md$', p.name).group(1)))
-txt = answers_md.read_text()
+txt = (ROOT / 'answers.md').read_text()
 parts = re.split(r'\n## ', txt)[1:]
 
 def parse(p):
