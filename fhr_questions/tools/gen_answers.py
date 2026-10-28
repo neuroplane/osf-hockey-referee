@@ -17,6 +17,17 @@ def media_url(kind, m):
     return f"https://referees.fhr.ru/static/files/{kind}/{module}/{m['subDir']}/{m['name']}"
 
 
+# «Золотые карточки» — ответы, ключи которых подтверждены реальными сдачами
+# зачётов (попытки 18.10, 21.10, 28.10.2026; см. exam_notes.md)
+GOLD = {
+    30, 93, 216, 253, 260, 271, 272, 276, 321, 329, 338, 339, 417, 419,
+    420, 423, 438, 463, 464, 466, 468, 469, 482, 490, 491, 497, 501, 504,
+    544, 559, 578, 599, 617, 632, 633, 634, 657, 662, 669, 700, 729, 754,
+    756, 763, 765, 801, 802, 804, 812, 827, 878, 900, 908, 911, 933, 958,
+    974, 979, 981, 988, 1004, 1040, 1041, 1044, 1046, 1047, 1048, 1049,
+    1060, 1072, 1076, 1083, 1084, 1102, 1128, 1150, 1183,
+}
+
 # Ответы на первые 100 активных вопросов (номер по порядку -> (ответ, правило))
 ANSWERS = {
 1:  ("Уложить в устойчивое боковое положение (восстановительная позиция)", "МОМ"),
@@ -1414,11 +1425,12 @@ for i, q in enumerate(ACT[:N], 1):
     vu, pu = media_url('videos', q.get('video')), media_url('images', q.get('photo'))
     links = ''.join(f'<a class="media" href="{u}" target="_blank">{lbl}</a>'
                     for u, lbl in ((vu, '🎥 видео'), (pu, '🖼 фото')) if u)
+    gold = ' <span class="gold" title="Ответ проверен ключом реального зачёта">★</span>' if i in GOLD else ''
     rows.append(
-        f'<section class="q" id="q{i}"><div class="qtext"><b>{i}.</b> {text}</div>'
+        f'<section class="q" id="q{i}"><div class="qtext"><b>{i}.{gold}</b> {text}</div>'
         f'<p class="ans">✅ {html.escape(ans)}</p>'
         f'<p class="rule">{html.escape(rule)} · id {q["id"]} {links}</p></section>')
-    md.append(f"## {i}. {render_q_md(q['text'])}")
+    md.append(f"## {i}{' ⭐' if i in GOLD else ''}. {render_q_md(q['text'])}")
     if vu: md.append(f"[видео]({vu})  ")
     if pu: md.append(f"[фото]({pu})  ")
     md.append(f"**Ответ:** {ans}  ")
@@ -1437,6 +1449,7 @@ body{{display:block}} main{{max-width:760px;margin:64px auto 40px;padding:0 16px
 .q{{border-bottom:1px solid var(--border);padding:14px 0}}
 .qtext{{font-size:14.5px;margin:0 0 8px}}
 .ans{{color:#7ee2a8;margin:0 0 4px}} .media{{font-size:12px;margin-left:6px}}
+.gold{{color:#ffd75e}}
 .rule{{color:var(--fg-dim);font-size:12.5px;margin:0}}
 table.pt{{border-collapse:collapse;margin:10px 0 4px;width:100%}}
 table.pt td{{border:1px solid var(--border);padding:6px 10px;font-size:13px;
@@ -1454,7 +1467,7 @@ nav#TOC a:hover{{color:var(--fg);background:var(--bg-3)}}
   <input id="search-input" type="search" placeholder="Поиск по вопросам и ответам…" autocomplete="off">
   <span id="search-count"></span>
 </div>
-<main><h1>Правильные ответы — вопросы 1–{len(ANSWERS)}</h1>
+<main><h1>Правильные ответы — вопросы 1–{len(ANSWERS)} <span class="gold" title="Ответы, проверенные ключами реальных зачётов">★ {len(GOLD)}</span></h1>
 <p style="color:var(--fg-dim)">База referees.fhr.ru · всего активных вопросов: {len(ACT)} · ответы выведены из правил ЕКП 2022/23, ИИХФ 2026/27 и методических материалов.</p>
 {''.join(rows)}
 </main>
