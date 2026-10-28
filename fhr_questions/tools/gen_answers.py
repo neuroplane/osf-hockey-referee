@@ -1437,13 +1437,14 @@ for i, q in enumerate(ACT[:N], 1):
     vu, pu = media_url('videos', q.get('video')), media_url('images', q.get('photo'))
     links = ''.join(f'<a class="media" href="{u}" target="_blank">{lbl}</a>'
                     for u, lbl in ((vu, '🎥 видео'), (pu, '🖼 фото')) if u)
-    gold = ' <span class="gold" title="Ответ проверен ключом реального зачёта">★</span>' if i in GOLD else ''
+    is_gold = i in GOLD or bool(ov and ov.get('gold'))
+    gold = '<span class="gold" title="Ответ проверен ключом реального зачёта">★</span>' if is_gold else ''
     rows.append(
-        f'<section class="q" id="q{i}" data-qid="{q["id"]}"><div class="qtext"><b>{i}.{gold}</b> {text}</div>'
+        f'<section class="q" id="q{i}" data-qid="{q["id"]}"><div class="qtext"><b>{i}.</b> {gold} {text}</div>'
         f'<p class="ans">✅ <span class="atext">{html.escape(ans)}</span>'
         f'<button class="qe" title="Редактировать ответ">✎</button></p>'
         f'<p class="rule"><span class="rref">{html.escape(rule)}</span> · id {q["id"]} {links}</p></section>')
-    md.append(f"## {i}{' ⭐' if i in GOLD else ''}. {render_q_md(q['text'])}")
+    md.append(f"## {i}{' ⭐' if is_gold else ''}. {render_q_md(q['text'])}")
     if vu: md.append(f"[видео]({vu})  ")
     if pu: md.append(f"[фото]({pu})  ")
     md.append(f"**Ответ:** {ans}  ")
@@ -1496,6 +1497,9 @@ body.admin .qe{{display:inline-block}}
   background:var(--bg-3);color:var(--fg);cursor:pointer;font-weight:600}}
 .amodal #am-save{{background:var(--accent);color:#10131a;border:none}}
 .amodal .msg{{font-size:12.5px;color:#8fe3ae;align-self:center}}
+.amodal .gchk{{display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;
+  font-size:13.5px;color:var(--fg)}}
+.amodal .gchk input{{width:auto;accent-color:#ffd75e}}
 </style></head><body>
 <nav id="TOC"><ul>{toc}</ul></nav>
 <div id="toc-backdrop"></div>
@@ -1547,6 +1551,7 @@ document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{TOC.classList.rem
 <textarea id="am-ans" rows="3"></textarea>
 <label class="lbl" for="am-rule">Правило</label>
 <input id="am-rule">
+<label class="lbl gchk"><input type="checkbox" id="am-gold"> ★ Золотая карточка (ключ проверен реальной сдачей)</label>
 <div class="btns"><button id="am-save">Сохранить</button>
 <button id="am-revert" style="display:none">Сбросить к исходному</button>
 <button id="am-close">Закрыть</button><span class="msg" id="am-msg"></span></div>
@@ -1560,16 +1565,25 @@ const API='/referee/api',ORIG={},AED={};let CUR=null;
 const $=id=>document.getElementById(id);
 document.querySelectorAll('.q').forEach(s=>{
   ORIG[s.dataset.qid]={ans:s.querySelector('.atext').textContent,
-                       rule:s.querySelector('.rref').textContent};});
+                       rule:s.querySelector('.rref').textContent,
+                       gold:!!s.querySelector('.qtext .gold')};});
 fetch(API+'/aedits').then(r=>r.json()).then(d=>{
   Object.assign(AED,d.items||{});for(const qid in AED)applyEdit(qid);});
 fetch(API+'/me',{credentials:'same-origin'}).then(r=>r.json()).then(u=>{
   if(u&&u.admin)document.body.classList.add('admin');});
+function setGold(s,on){
+  const b=s.querySelector('.qtext b');let g=s.querySelector('.qtext .gold');
+  if(on&&!g){g=document.createElement('span');g.className='gold';
+    g.title='Ответ проверен ключом реального зачёта';g.textContent='★';
+    b.after(' ',g);}
+  else if(!on&&g)g.remove();
+}
 function applyEdit(qid){
   const s=document.querySelector('.q[data-qid="'+qid+'"]');if(!s)return;
   const e=AED[qid];
   s.querySelector('.atext').textContent=e.ans;
   if(e.rule)s.querySelector('.rref').textContent=e.rule;
+  setGold(s,!!e.gold);
   if(!s.querySelector('.edmark')){
     const m=document.createElement('span');m.className='edmark';m.textContent='✎ правка';
     s.querySelector('.ans').appendChild(m);}
@@ -1583,6 +1597,7 @@ function openModal(s){
   $('am-q').textContent=s.querySelector('.qtext').textContent.trim().slice(0,300);
   $('am-ans').value=e?e.ans:ORIG[qid].ans;
   $('am-rule').value=e?(e.rule||''):ORIG[qid].rule;
+  $('am-gold').checked=e?!!e.gold:ORIG[qid].gold;
   $('am-revert').style.display=e?'':'none';$('am-msg').textContent='';
   $('amb').classList.add('open');$('am-ans').focus();
 }
@@ -1592,15 +1607,16 @@ $('amb').addEventListener('click',e=>{if(e.target.id==='amb')closeModal();});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
 $('am-save').onclick=()=>{
   const qid=CUR.dataset.qid;
-  const ans=$('am-ans').value.trim(),rule=$('am-rule').value.trim();
+  const ans=$('am-ans').value.trim(),rule=$('am-rule').value.trim(),
+        gold=$('am-gold').checked;
   if(!ans)return;
   fetch(API+'/aedit',{method:'POST',credentials:'same-origin',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({qid:+qid,ans:ans,rule:rule})})
+    body:JSON.stringify({qid:+qid,ans:ans,rule:rule,gold:gold})})
   .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(res=>{
     if(!res.ok){$('am-msg').style.color='#f0a49e';
       $('am-msg').textContent=res.d.error||'ошибка';return;}
-    AED[qid]={ans:ans,rule:rule};applyEdit(qid);
+    AED[qid]={ans:ans,rule:rule,gold:gold};applyEdit(qid);
     $('am-msg').style.color='#8fe3ae';$('am-msg').textContent='Сохранено ✔';
     $('am-revert').style.display='';})
   .catch(()=>{$('am-msg').textContent='нет связи';});
@@ -1611,6 +1627,7 @@ $('am-revert').onclick=()=>{
     delete AED[qid];
     CUR.querySelector('.atext').textContent=ORIG[qid].ans;
     CUR.querySelector('.rref').textContent=ORIG[qid].rule;
+    setGold(CUR,ORIG[qid].gold);
     const m=CUR.querySelector('.edmark');if(m)m.remove();
     $('am-revert').style.display='none';$('am-msg').textContent='Сброшено';});
 };

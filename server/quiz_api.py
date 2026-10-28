@@ -119,9 +119,11 @@ def init_db():
             qid INTEGER PRIMARY KEY,
             ans TEXT NOT NULL,
             rule TEXT,
+            gold BOOLEAN NOT NULL DEFAULT false,
             editor INTEGER REFERENCES users(id),
             updated BIGINT NOT NULL
         );
+        ALTER TABLE ansedits ADD COLUMN IF NOT EXISTS gold BOOLEAN NOT NULL DEFAULT false;
         """)
         con.commit()
 
@@ -466,15 +468,16 @@ def qedit_delete(qkey: str, req: Request):
 @app.get("/aedits")
 def aedits_list():
     with closing(db()) as con:
-        rows = con.execute("SELECT qid, ans, rule FROM ansedits").fetchall()
-    return {"items": {str(r["qid"]): {"ans": r["ans"], "rule": r["rule"] or ""}
-                      for r in rows}}
+        rows = con.execute("SELECT qid, ans, rule, gold FROM ansedits").fetchall()
+    return {"items": {str(r["qid"]): {"ans": r["ans"], "rule": r["rule"] or "",
+                                     "gold": r["gold"]} for r in rows}}
 
 
 class AEdit(BaseModel):
     qid: int
     ans: str = Field(min_length=1, max_length=500)
     rule: str = Field(default="", max_length=200)
+    gold: bool = False
 
 
 @app.post("/aedit")
@@ -484,11 +487,12 @@ def aedit_save(body: AEdit, req: Request):
         return JSONResponse({"error": "нет прав"}, status_code=403)
     with closing(db()) as con:
         con.execute(
-            "INSERT INTO ansedits (qid, ans, rule, editor, updated) "
-            "VALUES (%s,%s,%s,%s,%s) "
+            "INSERT INTO ansedits (qid, ans, rule, gold, editor, updated) "
+            "VALUES (%s,%s,%s,%s,%s,%s) "
             "ON CONFLICT(qid) DO UPDATE SET ans=excluded.ans, rule=excluded.rule, "
-            "editor=excluded.editor, updated=excluded.updated",
-            (body.qid, body.ans.strip(), body.rule.strip(), u["id"], int(time.time())))
+            "gold=excluded.gold, editor=excluded.editor, updated=excluded.updated",
+            (body.qid, body.ans.strip(), body.rule.strip(), body.gold,
+             u["id"], int(time.time())))
         con.commit()
     return {"ok": True}
 
