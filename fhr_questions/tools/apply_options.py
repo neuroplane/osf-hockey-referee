@@ -7,8 +7,9 @@ manual_options.json: { "№": ["неправильный1","неправильн
 Запуск: python3 fhr_questions/tools/apply_options.py
 """
 import json, re, sys
+from pathlib import Path
 
-ROOT = "/Users/alekseyboyarkin/CursorProjects/ОСФ СУДЕЙСТВО ХОККЕЙ"
+ROOT = str(Path(__file__).resolve().parents[2])
 DATA = f"{ROOT}/quiz/data/fhr_active.js"
 MANUAL = f"{ROOT}/fhr_questions/manual_options.json"
 

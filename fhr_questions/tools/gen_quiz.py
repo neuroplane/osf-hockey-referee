@@ -17,9 +17,9 @@ txt = pathlib.Path(SRC).read_text()
 parts = re.split(r'\n## ', txt)[1:]
 
 def parse(p):
-    num = int(p.split('.')[0])
+    num = int(re.match(r'\d+', p).group(0))
     lines = p.split('\n')
-    q = lines[0].split(' ', 1)[1].strip()
+    q = lines[0].replace(' ⭐', '').split(' ', 1)[1].strip()
     body, ans, rule, media = [], None, '', []
     for ln in lines[1:]:
         m = re.match(r'\*\*Ответ:\*\*\s*(.+)', ln)

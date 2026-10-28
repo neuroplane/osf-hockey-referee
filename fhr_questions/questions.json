@@ -1,6 +1,6 @@
 {
-  "questionsLastUpdate": "2026-10-15T14:43:27.000Z",
-  "count": 1903,
+  "questionsLastUpdate": "2026-10-20T09:47:32.000Z",
+  "count": 1904,
   "items": [
     {
       "id": 1724,
@@ -11838,6 +11838,26 @@
         "version": 0,
         "originalName": "Rule_53.8_Throwing_a_Stick[1].mp4",
         "durationMs": 18833,
+        "videoFileGroup": {
+          "moduleName": "exam-platform",
+          "entityName": "questionVideoFile"
+        }
+      },
+      "photo": null
+    },
+    {
+      "id": 4420,
+      "active": true,
+      "updatedAt": "2026-10-20T09:48:04.000Z",
+      "numRule": "75.2",
+      "text": "<p><strong>Какой штраф должен наложить Главный судья?</strong></p>",
+      "video": {
+        "id": 806,
+        "name": "3dfaf6341d77647a240b3d.mp4",
+        "subDir": "3df/af6",
+        "version": 0,
+        "originalName": "75.2_Снег в лицо.mp4",
+        "durationMs": 20340,
         "videoFileGroup": {
           "moduleName": "exam-platform",
           "entityName": "questionVideoFile"

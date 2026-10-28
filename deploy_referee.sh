@@ -33,7 +33,7 @@ scp -o BatchMode=yes server/quiz_api.py server/requirements.txt "tgbsrv:/opt/qui
 ssh -o BatchMode=yes tgbsrv \
   "/opt/quiz-api/venv/bin/pip -q install -r /opt/quiz-api/requirements.txt && systemctl restart quiz-api"
 scp -o BatchMode=yes \
-  fhr_questions/answers_1_1276.md fhr_questions/top40_rules.md \
+  fhr_questions/answers_1_1277.md fhr_questions/top40_rules.md \
   fhr_questions/exam_notes.md fhr_questions/questions.md \
   fhr_questions/questions_deleted.md fhr_questions/questions.json \
   fhr_questions/rules/rules.json fhr_questions/rules/rules_ekp_2022_23.json \

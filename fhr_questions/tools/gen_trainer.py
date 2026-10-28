@@ -11,13 +11,15 @@ FR, TO = (int(sys.argv[1]), int(sys.argv[2])) if len(sys.argv) > 2 else (1, 100)
 OUT = ROOT / 'trainer' / (sys.argv[3] if len(sys.argv) > 3 else 'data.js')
 random.seed(42)
 
-txt = (ROOT / 'answers_1_1276.md').read_text()
+answers_md = max(ROOT.glob('answers_1_*.md'),
+                 key=lambda p: int(re.search(r'_(\d+)\.md$', p.name).group(1)))
+txt = answers_md.read_text()
 parts = re.split(r'\n## ', txt)[1:]
 
 def parse(p):
-    num = int(p.split('.')[0])
+    num = int(re.match(r'\d+', p).group(0))
     lines = p.split('\n')
-    q = lines[0].split(' ', 1)[1].strip()
+    q = lines[0].replace(' ⭐', '').split(' ', 1)[1].strip()
     body, ans, rule, media = [], None, '', []
     for ln in lines[1:]:
         m = re.match(r'\*\*Ответ:\*\*\s*(.+)', ln)
