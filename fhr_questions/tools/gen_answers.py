@@ -1440,7 +1440,8 @@ for i, q in enumerate(ACT[:N], 1):
     gold = ' <span class="gold" title="Ответ проверен ключом реального зачёта">★</span>' if i in GOLD else ''
     rows.append(
         f'<section class="q" id="q{i}" data-qid="{q["id"]}"><div class="qtext"><b>{i}.{gold}</b> {text}</div>'
-        f'<p class="ans">✅ <span class="atext">{html.escape(ans)}</span></p>'
+        f'<p class="ans">✅ <span class="atext">{html.escape(ans)}</span>'
+        f'<button class="qe" title="Редактировать ответ">✎</button></p>'
         f'<p class="rule"><span class="rref">{html.escape(rule)}</span> · id {q["id"]} {links}</p></section>')
     md.append(f"## {i}{' ⭐' if i in GOLD else ''}. {render_q_md(q['text'])}")
     if vu: md.append(f"[видео]({vu})  ")
@@ -1474,7 +1475,11 @@ nav#TOC li{{list-style:none}} nav#TOC a{{display:block;padding:4px 10px;color:va
 nav#TOC a:hover{{color:var(--fg);background:var(--bg-3)}}
 @media(max-width:900px){{nav#TOC{{display:none}}}}
 .edmark{{color:#ffd75e;margin-left:8px;font-size:12px}}
-body.admin .q{{cursor:pointer}} body.admin .q:hover{{background:var(--bg-2)}}
+.qe{{display:none;margin-left:8px;padding:2px 7px;font-size:12px;line-height:1.4;
+  background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--fg-dim);cursor:pointer;vertical-align:middle}}
+.qe:hover{{color:var(--accent);border-color:var(--accent)}}
+body.admin .qe{{display:inline-block}}
 .amb{{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:50;
   align-items:center;justify-content:center;padding:16px}}
 .amb.open{{display:flex}}
@@ -1542,8 +1547,8 @@ function applyEdit(qid){
     s.querySelector('.ans').appendChild(m);}
 }
 document.querySelector('main').addEventListener('click',e=>{
-  if(!document.body.classList.contains('admin')||e.target.closest('a'))return;
-  const s=e.target.closest('.q');if(s)openModal(s);});
+  const b=e.target.closest('.qe');if(!b)return;
+  openModal(b.closest('.q'));});
 function openModal(s){
   CUR=s;const qid=s.dataset.qid,e=AED[qid];
   $('am-title').textContent='Вопрос '+s.id.replace('q','')+' · id '+qid;
