@@ -1508,17 +1508,28 @@ body.admin .qe{{display:inline-block}}
 </main>
 <script>
 const inp=document.getElementById('search-input'),cnt=document.getElementById('search-count'),
-      secs=[...document.querySelectorAll('.q')];
-const norm=s=>s.toLowerCase().replace(/ё/g,'е').replace(/[\s\u00a0]+/g,' ').trim();
-const IDX=secs.map(e=>({{el:e,txt:norm(e.textContent),num:+e.id.slice(1)}}));
+      secs=[...document.querySelectorAll('.q')],MAIN=document.querySelector('main');
+const norm=s=>s.toLowerCase().replace(/ё/g,'е').replace(/[\\s\\u00a0]+/g,' ').trim();
+const esc=s=>s.replace(/[.*+?^${{}}()|[\\]\\\\]/g,'\\\\$&');
+const IDX=secs.map((e,i)=>({{el:e,txt:norm(e.textContent),i:i,
+  qt:norm(e.querySelector('.qtext').textContent),num:+e.id.slice(1)}}));
+function score(o,toks,phrase,num){{
+ if(num)return o.num===num?999:(o.txt.includes(String(num))?1:0);
+ let s=0;
+ for(const t of toks){{
+  const w=new RegExp('(?:^| )'+esc(t));
+  if(w.test(o.qt))s+=30;else if(w.test(o.txt))s+=10;
+  else if(o.txt.includes(t))s+=3;else return 0;}}
+ if(phrase&&o.txt.includes(phrase))s+=50;
+ return s;}}
 inp.addEventListener('input',()=>{{
- const raw=inp.value.trim(),num=/^\d+$/.test(raw)?+raw:0,
-       toks=norm(raw).split(' ').filter(Boolean);
- let n=0;
- IDX.forEach(o=>{{const ok=!toks.length||num&&o.num===num||
-   toks.every(t=>o.txt.includes(t));
-   o.el.style.display=ok?'':'none';if(ok)n++}});
- cnt.textContent=n+'/'+secs.length;}});
+ const raw=inp.value.trim(),num=/^\\d+$/.test(raw)?+raw:0,
+       toks=norm(raw).split(' ').filter(Boolean),hits=[];
+ IDX.forEach(o=>{{const sc=toks.length?score(o,toks,norm(raw),num):1;
+  if(sc)hits.push([sc,o]);else o.el.style.display='none';}});
+ hits.sort((a,b)=>b[0]-a[0]||a[1].i-b[1].i);
+ hits.forEach(h=>{{h[1].el.style.display='';MAIN.appendChild(h[1].el);}});
+ cnt.textContent=toks.length?hits.length+'/'+secs.length:'';}});
 </script>
 <div class="amb" id="amb"><div class="amodal">
 <h3 id="am-title"></h3><p class="aq" id="am-q"></p>
