@@ -55,8 +55,15 @@ body.admin .qe{display:inline-block}
 <script>
 const inp=document.getElementById('search-input'),cnt=document.getElementById('search-count'),
       secs=[...document.querySelectorAll('.q')];
-inp.addEventListener('input',()=>{const s=inp.value.toLowerCase();let n=0;
- secs.forEach(e=>{const ok=!s||e.textContent.toLowerCase().includes(s);e.style.display=ok?'':'none';if(ok)n++});
+const norm=s=>s.toLowerCase().replace(/ё/g,'е').replace(/[\s ]+/g,' ').trim();
+const IDX=secs.map(e=>({el:e,txt:norm(e.textContent),num:+e.id.slice(1)}));
+inp.addEventListener('input',()=>{
+ const raw=inp.value.trim(),num=/^\d+$/.test(raw)?+raw:0,
+       toks=norm(raw).split(' ').filter(Boolean);
+ let n=0;
+ IDX.forEach(o=>{const ok=!toks.length||num&&o.num===num||
+   toks.every(t=>o.txt.includes(t));
+   o.el.style.display=ok?'':'none';if(ok)n++});
  cnt.textContent=n+'/'+secs.length;});
 </script>
 <div class="amb" id="amb"><div class="amodal">
