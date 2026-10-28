@@ -1468,12 +1468,12 @@ table.pt{{border-collapse:collapse;margin:10px 0 4px;width:100%}}
 table.pt td{{border:1px solid var(--border);padding:6px 10px;font-size:13px;
   text-align:center;vertical-align:middle}}
 table.pt tr:first-child td{{background:var(--bg-3);font-weight:600;color:var(--fg)}}
-nav#TOC{{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-w);overflow:auto;
-  background:var(--bg-2);border-right:1px solid var(--border);padding:56px 8px 16px}}
+@media(min-width:901px){{nav#TOC{{position:fixed;left:0;top:0;bottom:0;
+  width:var(--sidebar-w);overflow:auto;
+  background:var(--bg-2);border-right:1px solid var(--border);padding:56px 8px 16px}}}}
 nav#TOC li{{list-style:none}} nav#TOC a{{display:block;padding:4px 10px;color:var(--fg-dim);
   text-decoration:none;font-size:13px;border-radius:6px}}
 nav#TOC a:hover{{color:var(--fg);background:var(--bg-3)}}
-@media(max-width:900px){{nav#TOC{{display:none}}}}
 .edmark{{color:#ffd75e;margin-left:8px;font-size:12px}}
 .qe{{display:none;margin-left:8px;padding:2px 7px;font-size:12px;line-height:1.4;
   background:none;border:1px solid var(--border);border-radius:6px;
@@ -1498,7 +1498,9 @@ body.admin .qe{{display:inline-block}}
 .amodal .msg{{font-size:12.5px;color:#8fe3ae;align-self:center}}
 </style></head><body>
 <nav id="TOC"><ul>{toc}</ul></nav>
+<div id="toc-backdrop"></div>
 <div id="search-bar">
+  <button id="menu-toggle" title="Оглавление">&#9776;</button>
   <input id="search-input" type="search" placeholder="Поиск по вопросам и ответам…" autocomplete="off">
   <span id="search-count"></span>
 </div>
@@ -1530,6 +1532,14 @@ inp.addEventListener('input',()=>{{
  hits.sort((a,b)=>b[0]-a[0]||a[1].i-b[1].i);
  hits.forEach(h=>{{h[1].el.style.display='';MAIN.appendChild(h[1].el);}});
  cnt.textContent=toks.length?hits.length+'/'+secs.length:'';}});
+const TOC=document.getElementById('TOC'),BKD=document.getElementById('toc-backdrop');
+document.getElementById('menu-toggle').addEventListener('click',()=>{{
+ const o=TOC.classList.toggle('open');BKD.classList.toggle('open',o);}});
+BKD.addEventListener('click',()=>{{TOC.classList.remove('open');BKD.classList.remove('open');}});
+TOC.addEventListener('click',e=>{{if(e.target.closest('a')){{TOC.classList.remove('open');
+ BKD.classList.remove('open');}}}});
+document.addEventListener('keydown',e=>{{if(e.key==='Escape'){{TOC.classList.remove('open');
+ BKD.classList.remove('open');}}}});
 </script>
 <div class="amb" id="amb"><div class="amodal">
 <h3 id="am-title"></h3><p class="aq" id="am-q"></p>
