@@ -115,6 +115,13 @@ def init_db():
             editor INTEGER REFERENCES users(id),
             updated BIGINT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS ansedits (
+            qid INTEGER PRIMARY KEY,
+            ans TEXT NOT NULL,
+            rule TEXT,
+            editor INTEGER REFERENCES users(id),
+            updated BIGINT NOT NULL
+        );
         """)
         con.commit()
 
@@ -449,6 +456,50 @@ def qedit_delete(qkey: str, req: Request):
         return JSONResponse({"error": "нет прав"}, status_code=403)
     with closing(db()) as con:
         con.execute("DELETE FROM qedits WHERE qkey=%s", (qkey,))
+        con.commit()
+    return {"ok": True}
+
+
+# --- Правки правильных ответов (страница /referee/questions/) ---
+# Ключ — id вопроса в базе ФХР (стабилен при вставках, в отличие от № карточки).
+
+@app.get("/aedits")
+def aedits_list():
+    with closing(db()) as con:
+        rows = con.execute("SELECT qid, ans, rule FROM ansedits").fetchall()
+    return {"items": {str(r["qid"]): {"ans": r["ans"], "rule": r["rule"] or ""}
+                      for r in rows}}
+
+
+class AEdit(BaseModel):
+    qid: int
+    ans: str = Field(min_length=1, max_length=500)
+    rule: str = Field(default="", max_length=200)
+
+
+@app.post("/aedit")
+def aedit_save(body: AEdit, req: Request):
+    u = current_user(req)
+    if not u or u["id"] not in ADMIN_IDS:
+        return JSONResponse({"error": "нет прав"}, status_code=403)
+    with closing(db()) as con:
+        con.execute(
+            "INSERT INTO ansedits (qid, ans, rule, editor, updated) "
+            "VALUES (%s,%s,%s,%s,%s) "
+            "ON CONFLICT(qid) DO UPDATE SET ans=excluded.ans, rule=excluded.rule, "
+            "editor=excluded.editor, updated=excluded.updated",
+            (body.qid, body.ans.strip(), body.rule.strip(), u["id"], int(time.time())))
+        con.commit()
+    return {"ok": True}
+
+
+@app.delete("/aedit/{qid}")
+def aedit_delete(qid: int, req: Request):
+    u = current_user(req)
+    if not u or u["id"] not in ADMIN_IDS:
+        return JSONResponse({"error": "нет прав"}, status_code=403)
+    with closing(db()) as con:
+        con.execute("DELETE FROM ansedits WHERE qid=%s", (qid,))
         con.commit()
     return {"ok": True}
 

@@ -7,6 +7,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 Q = json.load(open(ROOT / 'questions.json'))
 ACT = [q for q in Q['items'] if q['active']]
 
+# Онлайн-правки ответов (POST /referee/api/aedit) — выгружаются pull_aedits.py
+# в aedits.json, ключ — id вопроса. Применяются поверх ANSWERS при генерации.
+AEDITS = {}
+_p = ROOT / 'aedits.json'
+if _p.exists():
+    AEDITS = json.loads(_p.read_text(encoding='utf-8'))
+
 def media_url(kind, m):
     if not m:
         return None
@@ -1422,15 +1429,19 @@ md = ["# Правильные ответы — база вопросов referee
       ""]
 for i, q in enumerate(ACT[:N], 1):
     ans, rule = ANSWERS[i]
+    ov = AEDITS.get(str(q['id']))
+    if ov:
+        ans = ov.get('ans') or ans
+        rule = ov.get('rule') or rule
     text = render_q(q['text'])
     vu, pu = media_url('videos', q.get('video')), media_url('images', q.get('photo'))
     links = ''.join(f'<a class="media" href="{u}" target="_blank">{lbl}</a>'
                     for u, lbl in ((vu, '🎥 видео'), (pu, '🖼 фото')) if u)
     gold = ' <span class="gold" title="Ответ проверен ключом реального зачёта">★</span>' if i in GOLD else ''
     rows.append(
-        f'<section class="q" id="q{i}"><div class="qtext"><b>{i}.{gold}</b> {text}</div>'
-        f'<p class="ans">✅ {html.escape(ans)}</p>'
-        f'<p class="rule">{html.escape(rule)} · id {q["id"]} {links}</p></section>')
+        f'<section class="q" id="q{i}" data-qid="{q["id"]}"><div class="qtext"><b>{i}.{gold}</b> {text}</div>'
+        f'<p class="ans">✅ <span class="atext">{html.escape(ans)}</span></p>'
+        f'<p class="rule"><span class="rref">{html.escape(rule)}</span> · id {q["id"]} {links}</p></section>')
     md.append(f"## {i}{' ⭐' if i in GOLD else ''}. {render_q_md(q['text'])}")
     if vu: md.append(f"[видео]({vu})  ")
     if pu: md.append(f"[фото]({pu})  ")
@@ -1462,6 +1473,24 @@ nav#TOC li{{list-style:none}} nav#TOC a{{display:block;padding:4px 10px;color:va
   text-decoration:none;font-size:13px;border-radius:6px}}
 nav#TOC a:hover{{color:var(--fg);background:var(--bg-3)}}
 @media(max-width:900px){{nav#TOC{{display:none}}}}
+.edmark{{color:#ffd75e;margin-left:8px;font-size:12px}}
+body.admin .q{{cursor:pointer}} body.admin .q:hover{{background:var(--bg-2)}}
+.amb{{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;z-index:50;
+  align-items:center;justify-content:center;padding:16px}}
+.amb.open{{display:flex}}
+.amodal{{background:var(--bg-2);border:1px solid var(--border);border-radius:14px;
+  max-width:560px;width:100%;padding:18px;box-shadow:0 12px 40px rgba(0,0,0,.5)}}
+.amodal h3{{margin:0 0 4px;font-size:15px}}
+.amodal .aq{{font-size:13px;color:var(--fg-dim);margin:0 0 10px;max-height:120px;overflow:auto}}
+.amodal textarea,.amodal input{{width:100%;box-sizing:border-box;background:var(--bg-3);
+  color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;
+  font-size:14px;font-family:inherit;resize:vertical}}
+.amodal .lbl{{font-size:12px;color:var(--fg-dim);margin:8px 0 4px;display:block}}
+.amodal .btns{{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}}
+.amodal button{{padding:8px 14px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg-3);color:var(--fg);cursor:pointer;font-weight:600}}
+.amodal #am-save{{background:var(--accent);color:#10131a;border:none}}
+.amodal .msg{{font-size:12.5px;color:#8fe3ae;align-self:center}}
 </style></head><body>
 <nav id="TOC"><ul>{toc}</ul></nav>
 <div id="search-bar">
@@ -1478,7 +1507,83 @@ const inp=document.getElementById('search-input'),cnt=document.getElementById('s
 inp.addEventListener('input',()=>{{const s=inp.value.toLowerCase();let n=0;
  secs.forEach(e=>{{const ok=!s||e.textContent.toLowerCase().includes(s);e.style.display=ok?'':'none';if(ok)n++}});
  cnt.textContent=n+'/'+secs.length;}});
-</script></body></html>"""
+</script>
+<div class="amb" id="amb"><div class="amodal">
+<h3 id="am-title"></h3><p class="aq" id="am-q"></p>
+<label class="lbl" for="am-ans">Правильный ответ</label>
+<textarea id="am-ans" rows="3"></textarea>
+<label class="lbl" for="am-rule">Правило</label>
+<input id="am-rule">
+<div class="btns"><button id="am-save">Сохранить</button>
+<button id="am-revert" style="display:none">Сбросить к исходному</button>
+<button id="am-close">Закрыть</button><span class="msg" id="am-msg"></span></div>
+</div></div>
+<script>MODAL_JS</script></body></html>"""
+
+# Редактор ответов: правки хранятся в БД (POST /referee/api/aedit) и мержатся
+# при загрузке; синхронизация в репозиторий — tools/pull_aedits.py -> aedits.json
+MODAL_JS = r"""
+const API='/referee/api',ORIG={},AED={};let CUR=null;
+const $=id=>document.getElementById(id);
+document.querySelectorAll('.q').forEach(s=>{
+  ORIG[s.dataset.qid]={ans:s.querySelector('.atext').textContent,
+                       rule:s.querySelector('.rref').textContent};});
+fetch(API+'/aedits').then(r=>r.json()).then(d=>{
+  Object.assign(AED,d.items||{});for(const qid in AED)applyEdit(qid);});
+fetch(API+'/me',{credentials:'same-origin'}).then(r=>r.json()).then(u=>{
+  if(u&&u.admin)document.body.classList.add('admin');});
+function applyEdit(qid){
+  const s=document.querySelector('.q[data-qid="'+qid+'"]');if(!s)return;
+  const e=AED[qid];
+  s.querySelector('.atext').textContent=e.ans;
+  if(e.rule)s.querySelector('.rref').textContent=e.rule;
+  if(!s.querySelector('.edmark')){
+    const m=document.createElement('span');m.className='edmark';m.textContent='✎ правка';
+    s.querySelector('.ans').appendChild(m);}
+}
+document.querySelector('main').addEventListener('click',e=>{
+  if(!document.body.classList.contains('admin')||e.target.closest('a'))return;
+  const s=e.target.closest('.q');if(s)openModal(s);});
+function openModal(s){
+  CUR=s;const qid=s.dataset.qid,e=AED[qid];
+  $('am-title').textContent='Вопрос '+s.id.replace('q','')+' · id '+qid;
+  $('am-q').textContent=s.querySelector('.qtext').textContent.trim().slice(0,300);
+  $('am-ans').value=e?e.ans:ORIG[qid].ans;
+  $('am-rule').value=e?(e.rule||''):ORIG[qid].rule;
+  $('am-revert').style.display=e?'':'none';$('am-msg').textContent='';
+  $('amb').classList.add('open');$('am-ans').focus();
+}
+function closeModal(){$('amb').classList.remove('open');CUR=null;}
+$('am-close').onclick=closeModal;
+$('amb').addEventListener('click',e=>{if(e.target.id==='amb')closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+$('am-save').onclick=()=>{
+  const qid=CUR.dataset.qid;
+  const ans=$('am-ans').value.trim(),rule=$('am-rule').value.trim();
+  if(!ans)return;
+  fetch(API+'/aedit',{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({qid:+qid,ans:ans,rule:rule})})
+  .then(r=>r.json().then(d=>({ok:r.ok,d}))).then(res=>{
+    if(!res.ok){$('am-msg').style.color='#f0a49e';
+      $('am-msg').textContent=res.d.error||'ошибка';return;}
+    AED[qid]={ans:ans,rule:rule};applyEdit(qid);
+    $('am-msg').style.color='#8fe3ae';$('am-msg').textContent='Сохранено ✔';
+    $('am-revert').style.display='';})
+  .catch(()=>{$('am-msg').textContent='нет связи';});
+};
+$('am-revert').onclick=()=>{
+  const qid=CUR.dataset.qid;
+  fetch(API+'/aedit/'+qid,{method:'DELETE',credentials:'same-origin'}).then(()=>{
+    delete AED[qid];
+    CUR.querySelector('.atext').textContent=ORIG[qid].ans;
+    CUR.querySelector('.rref').textContent=ORIG[qid].rule;
+    const m=CUR.querySelector('.edmark');if(m)m.remove();
+    $('am-revert').style.display='none';$('am-msg').textContent='Сброшено';});
+};
+"""
+
+page = page.replace('MODAL_JS', MODAL_JS)
 out = ROOT / 'questions'
 out.mkdir(exist_ok=True)
 (out / 'index.html').write_text(page, encoding='utf-8')
