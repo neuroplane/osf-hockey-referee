@@ -145,44 +145,36 @@
     });
   };
 
-  // Загрузка наборов по manifest.js: колбэк получает готовый реестр.
-  // После файлов подтягиваются переопределения из БД (правки редактора).
+  // Загрузка наборов: сначала банк из БД (/questions, там же правки редактора),
+  // при недоступности API — статические data-файлы по manifest.js.
   Q.load = function (baseUrl, done) {
+    fetch(Q.API + '/questions')
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (d) {
+        if (d.sets && d.sets.length) {
+          window.QUIZ_SETS = d.sets;
+          done();
+        } else {
+          Q.loadFiles(baseUrl, done);
+        }
+      })
+      .catch(function () { Q.loadFiles(baseUrl, done); });
+  };
+
+  Q.loadFiles = function (baseUrl, done) {
     var s = document.createElement('script');
     s.src = baseUrl + 'data/manifest.js';
     s.onload = function () {
       var files = window.QUIZ_MANIFEST || [];
       var left = files.length;
-      var finish = function () { Q.loadOverrides().then(done); };
-      if (!left) return finish();
+      if (!left) return done();
       files.forEach(function (f) {
         var sc = document.createElement('script');
         sc.src = baseUrl + 'data/' + f;
-        sc.onload = sc.onerror = function () { if (!--left) finish(); };
+        sc.onload = sc.onerror = function () { if (!--left) done(); };
         document.head.appendChild(sc);
       });
     };
     document.head.appendChild(s);
-  };
-
-  // Переопределения вопросов из /qedits применяются поверх data.js:
-  // ключ set_id:№ → {q, opts, correct}
-  Q.overrides = {};
-  Q.loadOverrides = function () {
-    return fetch(Q.API + '/qedits')
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        Q.overrides = d.items || {};
-        Q.sets().forEach(function (st) {
-          st.questions.forEach(function (q) {
-            var o = Q.overrides[st.id + ':' + q.n];
-            if (!o) return;
-            if (!q._orig) q._orig = { q: q.q, opts: q.opts.slice(), correct: q.correct };
-            if (o.q) q.q = o.q;
-            if (o.opts && o.opts.length === 4) q.opts = o.opts;
-            if (o.correct != null) q.correct = o.correct;
-          });
-        });
-      }).catch(function () {});
   };
 })();

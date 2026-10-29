@@ -33,6 +33,8 @@ THRESHOLD = int(os.environ.get("VOTE_THRESHOLD", "5"))
 SESSION_TTL = 60 * 60 * 24 * 30  # 30 дней
 CALLBACK_URL = f"{SITE_URL}{BASE_URL}/auth/callback"
 ADMIN_IDS = {int(x) for x in os.environ.get("ADMIN_IDS", "").split(",") if x.strip().isdigit()}
+# Директория с data-файлами наборов (quiz/data/*.js) — источник для сидирования банка в БД
+QUIZ_DATA_DIR = os.environ.get("QUIZ_DATA_DIR", "/var/www/sport.tgbsrv.ru/referee/quiz/data")
 
 # Шифрование персональных данных (имя, логин) в базе. Ключ — NAME_KEY в .env,
 # сгенерировать: python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -124,11 +126,79 @@ def init_db():
             updated BIGINT NOT NULL
         );
         ALTER TABLE ansedits ADD COLUMN IF NOT EXISTS gold BOOLEAN NOT NULL DEFAULT false;
+        CREATE TABLE IF NOT EXISTS qsets (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            daily BOOLEAN NOT NULL DEFAULT TRUE,
+            ord INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS questions (
+            qkey TEXT PRIMARY KEY,
+            set_id TEXT NOT NULL REFERENCES qsets(id),
+            n INTEGER NOT NULL,
+            q TEXT NOT NULL,
+            qtable TEXT NOT NULL DEFAULT '',
+            media TEXT NOT NULL DEFAULT '[]',
+            opts TEXT NOT NULL,
+            correct INTEGER NOT NULL,
+            rule TEXT NOT NULL DEFAULT '',
+            edited BOOLEAN NOT NULL DEFAULT FALSE,
+            orig_q TEXT, orig_opts TEXT, orig_correct INTEGER,
+            editor INTEGER REFERENCES users(id),
+            updated BIGINT NOT NULL DEFAULT 0
+        );
         """)
         con.commit()
 
 
+# --- Банк вопросов в БД ---
+# q/opts/correct — действующие значения (отдаются клиентам).
+# edited=FALSE: это исходник из data-файла, orig_* пустые.
+# edited=TRUE: это ручная правка, orig_* хранит исходник для отката.
+# Синхронизация при старте: исходник обновляется всегда, правки сохраняются.
+
+def seed_questions():
+    import glob
+    files = sorted(glob.glob(os.path.join(QUIZ_DATA_DIR, "*.js")))
+    if not files:
+        return
+    now = int(time.time())
+    with closing(db()) as con:
+        for f in files:
+            src = open(f, encoding="utf-8").read()
+            for payload in re.findall(r"QUIZ_SETS\.push\((\{.*?\})\)\s*;", src, re.S):
+                try:
+                    st = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                con.execute(
+                    "INSERT INTO qsets (id, title, daily) VALUES (%s,%s,%s) "
+                    "ON CONFLICT(id) DO UPDATE SET title=excluded.title, daily=excluded.daily",
+                    (st["id"], st["title"], st.get("daily", True)))
+                for q in st.get("questions", []):
+                    con.execute("""
+                        INSERT INTO questions
+                            (qkey,set_id,n,q,qtable,media,opts,correct,rule,edited,updated)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE,%s)
+                        ON CONFLICT(qkey) DO UPDATE SET
+                            set_id=excluded.set_id, n=excluded.n,
+                            qtable=excluded.qtable, media=excluded.media, rule=excluded.rule,
+                            q       = CASE WHEN questions.edited THEN questions.q       ELSE excluded.q END,
+                            opts    = CASE WHEN questions.edited THEN questions.opts    ELSE excluded.opts END,
+                            correct = CASE WHEN questions.edited THEN questions.correct ELSE excluded.correct END,
+                            orig_q       = CASE WHEN questions.edited THEN excluded.q       ELSE NULL END,
+                            orig_opts    = CASE WHEN questions.edited THEN excluded.opts    ELSE NULL END,
+                            orig_correct = CASE WHEN questions.edited THEN excluded.correct ELSE NULL END
+                        """, (f"{st['id']}:{q['n']}", st["id"], q["n"], q["q"],
+                              q.get("table", ""), json.dumps(q.get("media", []), ensure_ascii=False),
+                              json.dumps(q["opts"], ensure_ascii=False), q["correct"],
+                              q.get("rule", ""), now))
+        con.commit()
+    print(f"seed_questions: синхронизировано {len(files)} файлов из {QUIZ_DATA_DIR}")
+
+
 init_db()
+seed_questions()
 
 
 def current_user(req: Request):
@@ -409,14 +479,25 @@ def question_stats(day: int = 0):
     return {"day": day, "items": [dict(r) for r in rows]}
 
 
-# --- Редактор вопросов: переопределения лежат в БД и мержатся в data.js на лету ---
+# --- Банк вопросов и редактор ---
 
-@app.get("/qedits")
-def qedits_list():
+@app.get("/questions")
+def questions_all():
+    """Весь банк для квиз-движка: наборы → вопросы с действующими вариантами."""
     with closing(db()) as con:
-        rows = con.execute("SELECT qkey, q_text, opts, correct FROM qedits").fetchall()
-    return {"items": {r["qkey"]: {"q": r["q_text"], "opts": json.loads(r["opts"]),
-                                  "correct": r["correct"]} for r in rows}}
+        sets = con.execute("SELECT id, title, daily FROM qsets ORDER BY ord, id").fetchall()
+        rows = con.execute(
+            "SELECT set_id, n, q, qtable, media, opts, correct, rule, edited "
+            "FROM questions ORDER BY set_id, n").fetchall()
+    by_set = {s["id"]: {"id": s["id"], "title": s["title"], "daily": s["daily"],
+                        "questions": []} for s in sets}
+    for r in rows:
+        if r["set_id"] in by_set:
+            by_set[r["set_id"]]["questions"].append({
+                "n": r["n"], "q": r["q"], "table": r["qtable"],
+                "media": json.loads(r["media"]), "opts": json.loads(r["opts"]),
+                "correct": r["correct"], "rule": r["rule"], "edited": r["edited"]})
+    return {"sets": [s for s in by_set.values() if s["questions"]]}
 
 
 class QEdit(BaseModel):
@@ -440,13 +521,19 @@ def qedit_save(body: QEdit, req: Request):
     if body.q is not None and len(q_text) < 10:
         return JSONResponse({"error": "текст вопроса слишком короткий"}, status_code=400)
     with closing(db()) as con:
-        con.execute(
-            "INSERT INTO qedits (qkey, q_text, opts, correct, editor, updated) "
-            "VALUES (%s,%s,%s,%s,%s,%s) "
-            "ON CONFLICT(qkey) DO UPDATE SET q_text=excluded.q_text, opts=excluded.opts, "
-            "correct=excluded.correct, editor=excluded.editor, updated=excluded.updated",
-            (body.qkey, q_text, json.dumps(opts, ensure_ascii=False), body.correct,
-             u["id"], int(time.time())))
+        row = con.execute("SELECT q FROM questions WHERE qkey=%s", (body.qkey,)).fetchone()
+        if not row:
+            return JSONResponse({"error": "вопрос не найден"}, status_code=404)
+        con.execute("""
+            UPDATE questions SET
+                q=%s, opts=%s, correct=%s, edited=TRUE,
+                orig_q       = COALESCE(orig_q, q),
+                orig_opts    = COALESCE(orig_opts, opts),
+                orig_correct = COALESCE(orig_correct, correct),
+                editor=%s, updated=%s
+            WHERE qkey=%s""",
+            (q_text if q_text else row["q"], json.dumps(opts, ensure_ascii=False),
+             body.correct, u["id"], int(time.time()), body.qkey))
         con.commit()
     return {"ok": True}
 
@@ -457,9 +544,21 @@ def qedit_delete(qkey: str, req: Request):
     if not u or u["id"] not in ADMIN_IDS:
         return JSONResponse({"error": "нет прав"}, status_code=403)
     with closing(db()) as con:
-        con.execute("DELETE FROM qedits WHERE qkey=%s", (qkey,))
+        row = con.execute(
+            "SELECT orig_q, orig_opts, orig_correct FROM questions WHERE qkey=%s",
+            (qkey,)).fetchone()
+        if not row or row["orig_opts"] is None:
+            return JSONResponse({"error": "правки нет — вопрос исходный"}, status_code=400)
+        con.execute("""
+            UPDATE questions SET q=orig_q, opts=orig_opts, correct=orig_correct,
+                edited=FALSE, orig_q=NULL, orig_opts=NULL, orig_correct=NULL,
+                editor=%s, updated=%s WHERE qkey=%s""",
+            (u["id"], int(time.time()), qkey))
+        cur = con.execute(
+            "SELECT q, opts, correct FROM questions WHERE qkey=%s", (qkey,)).fetchone()
         con.commit()
-    return {"ok": True}
+    return {"ok": True, "q": cur["q"], "opts": json.loads(cur["opts"]),
+            "correct": cur["correct"]}
 
 
 # --- Правки правильных ответов (страница /referee/questions/) ---

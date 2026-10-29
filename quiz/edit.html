@@ -89,7 +89,7 @@
   });
 
   function qkey(it) { return it.set + ':' + it.q.n; }
-  function edited(it) { return !!QUIZ.overrides[qkey(it)]; }
+  function edited(it) { return !!it.q.edited; }
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, function (c) {
@@ -187,10 +187,8 @@
       .then(function (res) {
         if (!res.ok) { el('msg').textContent = res.d.error || 'ошибка'; el('msg').style.color = '#f0a49e'; return; }
         var q = cur.q;
-        if (!q._orig) q._orig = { q: q.q, opts: q.opts.slice(), correct: q.correct };
         if (qChanged) q.q = qtext;
-        q.opts = opts; q.correct = correct;
-        QUIZ.overrides[qkey(cur)] = { q: qChanged ? qtext : null, opts: opts, correct: correct };
+        q.opts = opts; q.correct = correct; q.edited = true;
         el('msg').style.color = '#8fe3ae';
         el('msg').textContent = 'Сохранено ✔';
         el('revert').style.display = '';
@@ -202,10 +200,10 @@
     if (!cur) return;
     fetch(QUIZ.API + '/qedit/' + encodeURIComponent(qkey(cur)), {
       method: 'DELETE', credentials: 'same-origin'
-    }).then(function () {
+    }).then(function (r) { return r.json(); }).then(function (d) {
       var q = cur.q;
-      if (q._orig) { q.q = q._orig.q; q.opts = q._orig.opts; q.correct = q._orig.correct; }
-      delete QUIZ.overrides[qkey(cur)];
+      if (d.opts) { q.q = d.q; q.opts = d.opts; q.correct = d.correct; }
+      q.edited = false;
       el('msg').style.color = '#8fe3ae';
       el('msg').textContent = 'Сброшено к исходному';
       openEditor(qkey(cur));

@@ -11,6 +11,7 @@
 import json, re, random, pathlib, sys
 
 SRC, FR, TO, QID, TITLE, OUT = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4], sys.argv[5], sys.argv[6]
+DAILY = len(sys.argv) < 8 or sys.argv[7] != "0"
 random.seed(42)
 
 txt = pathlib.Path(SRC).read_text()
@@ -147,6 +148,6 @@ out = pathlib.Path(OUT)
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(
     'window.QUIZ_SETS=window.QUIZ_SETS||[];window.QUIZ_SETS.push('
-    + json.dumps(dict(id=QID, title=TITLE, daily=True, questions=qs), ensure_ascii=False)
+    + json.dumps(dict(id=QID, title=TITLE, daily=DAILY, questions=qs), ensure_ascii=False)
     + ');\n')
 print(f'{out}: {len(qs)} вопросов ({QID})')
