@@ -1,4 +1,4 @@
-/* Движок викторины: карточка вопроса → 4 варианта → разбор.
+/* Движок викторины: карточка вопроса → варианты (2–4) → разбор.
    Наборы вопросов подключаются файлами quiz/data/*.js, которые делают
    window.QUIZ_SETS.push({id, title, daily, questions:[{n,q,table,media,opts,correct,rule}]}).
    Список файлов — в quiz/data/manifest.js. */

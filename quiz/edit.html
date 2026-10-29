@@ -30,6 +30,8 @@
 .orow .otxt { flex: 1; padding: 9px 11px; font-size: 13.5px; color: var(--fg);
               background: var(--bg-3); border: 1px solid var(--border); border-radius: 8px; }
 .orow .otxt.ok { border-color: #4caf7d; }
+#octrl { margin-top: 8px; font-size: 13px; }
+#octrl a { color: var(--accent); text-decoration: none; margin-right: 14px; cursor: pointer; }
 #ebtns { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
 #ebtns button { padding: 9px 16px; font-size: 14px; font-weight: 600; border-radius: 8px;
                 cursor: pointer; border: 1px solid var(--border); background: var(--bg-3); color: var(--fg); }
@@ -59,6 +61,10 @@
       <div class="ehead" id="ehead"></div>
       <textarea id="eq" rows="3"></textarea>
       <div id="orows"></div>
+      <div id="octrl">
+        <a href="#" id="addopt">+ вариант</a>
+        <a href="#" id="delopt">− вариант</a>
+      </div>
       <div id="ebtns">
         <button id="save">Сохранить</button>
         <button id="revert">Сбросить к исходному</button>
@@ -154,6 +160,35 @@
     el('editor').classList.add('open');
     el('editor').scrollIntoView({ block: 'nearest' });
   }
+
+  function addOptRow() {
+    var orows = el('orows');
+    if (orows.children.length >= 4) return;
+    var row = document.createElement('div');
+    row.className = 'orow';
+    var r = document.createElement('input');
+    r.type = 'radio'; r.name = 'corr';
+    r.addEventListener('change', markOk);
+    var t = document.createElement('input');
+    t.className = 'otxt'; t.placeholder = 'новый вариант';
+    row.appendChild(r); row.appendChild(t);
+    orows.appendChild(row);
+  }
+
+  function delOptRow() {
+    var orows = el('orows');
+    if (orows.children.length <= 2) return;
+    var last = orows.lastElementChild;
+    var wasOk = last.querySelector('input[type=radio]').checked;
+    orows.removeChild(last);
+    if (wasOk) {
+      orows.children[0].querySelector('input[type=radio]').checked = true;
+      markOk();
+    }
+  }
+
+  el('addopt').addEventListener('click', function (e) { e.preventDefault(); addOptRow(); });
+  el('delopt').addEventListener('click', function (e) { e.preventDefault(); delOptRow(); });
 
   function markOk() {
     var rows = el('orows').children;

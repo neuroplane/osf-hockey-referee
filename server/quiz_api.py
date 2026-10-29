@@ -515,8 +515,11 @@ def qedit_save(body: QEdit, req: Request):
     if not re.match(r"^[\w\-]+:\d+$", body.qkey):
         return JSONResponse({"error": "кривой ключ вопроса"}, status_code=400)
     opts = [o.strip() for o in body.opts]
-    if len(opts) != 4 or len(set(opts)) != 4 or any(not o or len(o) > 500 for o in opts):
-        return JSONResponse({"error": "нужно ровно 4 разных варианта"}, status_code=400)
+    if not (2 <= len(opts) <= 4) or len(set(opts)) != len(opts) or \
+            any(not o or len(o) > 500 for o in opts):
+        return JSONResponse({"error": "нужно 2–4 разных непустых варианта"}, status_code=400)
+    if body.correct >= len(opts):
+        return JSONResponse({"error": "верный ответ за пределами вариантов"}, status_code=400)
     q_text = body.q.strip() if body.q else None
     if body.q is not None and len(q_text) < 10:
         return JSONResponse({"error": "текст вопроса слишком короткий"}, status_code=400)
