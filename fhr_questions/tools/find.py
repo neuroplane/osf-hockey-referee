@@ -109,7 +109,9 @@ def main():
         t = set(n.split())
         return len(qtok & t) / max(1, len(t))
     for pool, label in ((ACT, 'активные'), (ALL, 'вся база')):
-        hits = sorted(pool, key=score, reverse=True)[:3]
+        # при равном скоре — более длинная (конкретная) карточка выше:
+        # «дисциплинарного до конца матча» должна обыгрывать «дисциплинарного»
+        hits = sorted(pool, key=lambda q: (score(q), len(norm(q['text']))), reverse=True)[:3]
         hits = [h for h in hits if score(h) >= 0.45]
         if hits:
             if label == 'вся база': print('(в активных не нашлось — поиск по всей базе)')
